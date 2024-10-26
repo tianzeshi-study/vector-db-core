@@ -1,0 +1,15 @@
+[package]
+name = "vector-db"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "vector_db"
+crate-type = ["cdylib"]
+
+[dependencies]
+bincode = "1.3.3"
+byteorder = "1.5.0"
+pyo3 = "0.22.0"
+serde ={version="1.0.213", features = ["derive"] }
