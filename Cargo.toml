@@ -12,4 +12,5 @@ crate-type = ["cdylib"]
 bincode = "1.3.3"
 byteorder = "1.5.0"
 pyo3 = "0.22.0"
+rayon = "1.10.0"
 serde ={version="1.0.213", features = ["derive"] }
