@@ -68,8 +68,7 @@ impl FileAccessService {
         // 读取数据
         let mut fs = OpenOptions::new().read(true).open( & self.path).expect("Unable to open file");
         fs.seek(SeekFrom::Start(offset)).expect("Unable to seek to offset");
-        let mut buffer = vec![0;
-                length];
+        let mut buffer = vec![0;length];
         fs.read_exact( & mut buffer).expect("Failed to read the expected length of data");
         buffer
     }
