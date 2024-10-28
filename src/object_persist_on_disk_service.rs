@@ -26,7 +26,7 @@ where
 }
 
 
-impl<T> ObjectPersistOnDiskService<T>
+impl<T: Send> ObjectPersistOnDiskService<T>
 where
     // T: Serialize + for<'de> Deserialize<'de> + Default,
     T: Serialize + for<'de> Deserialize<'de> + Default + 'static,
@@ -83,7 +83,7 @@ where
     }
 
     /// 从字节数组反序列化为对象
-    fn deserialize_object(data: &[u8]) -> T {
+    fn deserialize_object(data: &[u8]) -> T{
         bincode::deserialize(data).expect("Deserialization failed")
     }
 
@@ -153,9 +153,10 @@ objs
 
         let file_guard = self.structure_file.lock().unwrap();
         let  data: Vec<u8> = file_guard.read_in_file(offset, length);
-        let objs: Vec<T> = data.chunks(size_of_object)
-        .map(|data| Self::deserialize_object(data))
-        // .map(|chunk| chunk.to_vec())
+        // let objs: Vec<T> = data.chunks(size_of_object)
+        // .map(|data| Self::deserialize_object(data)) // one thread  deserialize 
+        let objs: Vec<T> = data.par_chunks(size_of_object)
+        .map(|data| Self::deserialize_object(data)) 
         .collect(); 
         
         objs
