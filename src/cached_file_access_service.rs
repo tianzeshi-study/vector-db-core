@@ -1,5 +1,5 @@
 use std::collections::{HashMap, LinkedList};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use crate::file_access_service::FileAccessService;
 
@@ -57,8 +57,8 @@ impl CachedFileAccessService {
         while remaining_length > 0 {
             let page_offset = current_offset / self.page_size as u64;
             let page_start = (current_offset % self.page_size as u64) as usize;
-            dbg!(current_offset, self.page_size);
-            dbg!(page_offset, page_start);
+            // dbg!(current_offset, self.page_size);
+            // dbg!(page_offset, page_start);
             let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
 
             let page_data = self.get_page_from_cache(page_offset);
@@ -138,6 +138,7 @@ fn remove_item(lru_list: &mut LinkedList<u64>, page: u64) {
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {

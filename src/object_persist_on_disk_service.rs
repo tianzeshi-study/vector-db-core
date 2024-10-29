@@ -15,7 +15,7 @@ const LENGTH_MARKER_SIZE: usize = size_of::<i32>(); // We reserve the first 4 by
 /// 提供了将对象序列化和反序列化到磁盘的服务
 /// 
 /// - `T`: 要序列化的对象类型，必须实现 `Serialize` 和 `DeserializeOwned` 特征
-pub struct ObjectPersistOnDiskService<T>
+pub struct ObjectPersistOnDiskService<T: Send>
 where
     T: Serialize + for<'de> Deserialize<'de> + Default,
 {
@@ -26,7 +26,7 @@ where
 }
 
 
-impl<T: Send> ObjectPersistOnDiskService<T>
+impl<T: Send+Sync> ObjectPersistOnDiskService<T>
 where
     // T: Serialize + for<'de> Deserialize<'de> + Default,
     T: Serialize + for<'de> Deserialize<'de> + Default + 'static,
@@ -84,6 +84,7 @@ where
 
     /// 从字节数组反序列化为对象
     fn deserialize_object(data: &[u8]) -> T{
+        // println!("{:?}", data);
         bincode::deserialize(data).expect("Deserialization failed")
     }
 
@@ -91,6 +92,7 @@ where
     fn write_index(&self, index: i64, obj: T) {
         let size_of_object = get_item_size::<T>();
         let data = Self::serialize_object(&obj);
+        println!("bytes length of data to write once: {} ", &data.len());
         // let offset = (4 + (index as usize * data.len())) as u64;
         let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
@@ -99,19 +101,55 @@ where
         // file.write_all(&data).expect("Write failed.");
         file.write_in_file(offset, &data); 
     }
+    
+    fn bulk_write_index(&self, index: i64, objs: Vec<T>) {
+        let size_of_object = get_item_size::<T>();
+        let count  = objs.len();
+        let mut buffer: Vec<u8> = vec![0; size_of_object * count];
+        println!("length of buffer: {}", buffer.len());
+        
+        let data: Vec<u8> = objs.par_iter()
+        .map(|obj| Self::serialize_object(obj))
+        // .map(|obj| 
+        .flatten()
+        .collect::<Vec<u8>>();
+        
+    // 填充缓冲区
+    let mut current_position = 0;
+    for obj in &objs {
+        let serialized_obj = Self::serialize_object(obj);
+        let serialized_size = serialized_obj.len();
 
-// fn write_bulk(&self, index: i64, objs: Vec<T>) {
-        // let size_of_object = get_item_size::<Vec<T>>();
-        // let data = Self::serialize_object(&obj);
+        // 将序列化对象写入缓冲区
+        buffer[current_position..current_position + serialized_size].copy_from_slice(&serialized_obj);
+        current_position += serialized_size;
+        let white_space = size_of_object -  serialized_size;
+        println!("white_space: {}", white_space);
 
-        // objs.par_iter().enumerate().for_each(|(i, obj)| {
-            // serialize_bytes(obj, buffer, size_of_object * i);
-        // });
-        // let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        current_position += white_space;
+    }
+    
+        let vec_data: Vec<Vec<u8>> = objs.par_iter()
+        .map(|obj| Self::serialize_object(obj))
+        .collect::<Vec<Vec<u8>>>();
+        println!("bulk write size_of_object:{}", size_of_object);
+        println!("length of  vec_data:{}", vec_data.len());
+        println!("length of  item of vec_data:{}", vec_data[0].len());
+        println!("bytes of vec_data:{}", vec_data[0].len() * vec_data.len()); 
+        
+        // .flat_map(|vec| vec)
+        // let offset = (4 + (index as usize * data.len())) as u64;
+        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        println!("bulk write offset: {}",  offset);
+        println!("bulk write data length:{}", data.len());
 
-        // let file = self.structure_file.lock().unwrap();
-        // file.write_in_file(offset, &data); 
-    // }
+        let file_guard = self.structure_file.lock().unwrap();
+        // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
+        // file.write_all(&data).expect("Write failed.");
+        // file_guard.write_in_file(offset, &data); 
+        file_guard.write_in_file(offset, &buffer); 
+    }
+
 
     /// 添加单个对象
     pub fn add(&self, obj: T) {
@@ -125,6 +163,20 @@ where
         self.write_index(index_to_write.into(), obj);
     }
     
+    pub fn add_bulk(&self, objs: Vec<T>) {
+        let index_to_write = {
+            let mut length = self.length.lock().unwrap();
+            let count = objs.len(); 
+            let index = *length;
+            *length += count as i32;
+            *length += 1;
+            self.save_length(*length);
+            index
+        };
+        println!("add bulk index_to_write:{}", index_to_write);
+        self.bulk_write_index(index_to_write.into(), objs);
+    }
+    
     pub fn read(&self, index: usize, count: usize) -> T{
         let size_of_object = get_item_size::<T>();
         // let offset = (4 + (index as usize * data.len())) as u64;
@@ -134,14 +186,16 @@ where
         let file_guard = self.structure_file.lock().unwrap();
         let length = count*size_of_object;
         println!("read length:{}", length);
-        let  data: Vec<u8> = file_guard.read_in_file(offset, length); 
-        let objs = Self::deserialize_object(&data);
+        let  data: Vec<u8> = file_guard.read_in_file(offset, length);
+        dbg!(&data.len());
+        let obj = Self::deserialize_object(&data);
+
 
         
         // let buffer: [u8; std::mem::size_of::<i32>()] = length.to_ne_bytes();
         // let file_guard = self.structure_file.lock().unwrap();
         // file_guard.read_in_file(0, &buffer);
-objs
+obj
     }
     
     pub fn read_bulk(&self, index: usize, count: usize) -> Vec<T>{
@@ -192,10 +246,17 @@ fn get_item_size<T>() -> usize {
     size_of::<T>()
 }
 
-
  # [cfg(test)]
 mod test {
     use super:: * ;
+    
+    #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+        struct ExampleStruct {
+            my_number: i32,
+            my_string: String,
+            // my_boolean: bool,
+        }
+        
      # [test]
     fn test_object_persist_on_disk_service() {
 
@@ -287,39 +348,25 @@ struct IntStruct {id: i32}
     }
 
     # [test]
-    fn test_read() {
+    fn test_read_one() {
         // 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
-        #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-        struct MyStruct {
-            my_number: i32,
-            my_string: String,
-            // my_str: &'1 str,
-            // my_boolean: bool,
-        }
 
-        // 创建服务实例        
-        let my_service = ObjectPersistOnDiskService:: <Vec<MyStruct>> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        let my_read_service = ObjectPersistOnDiskService:: <MyStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        let my_read_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
         for i in 0..10 {
         // 示例添加对象
-        let test_string = "hello, world!".to_string();
-        let my_obj = MyStruct {
+        let my_obj = ExampleStruct {
             my_number: i,
-            // my_string: format!("hello, world!{i}").to_string(),
-            // my_string: "hello, world!".to_string(),
-            my_string: test_string,
-            // my_str: "hello str",
-            // my_boolean: true,
+            my_string: format!("hello, world!{i}").to_string(),
         };
         objs_list.push(my_obj.clone());
-        // my_read_service.add(my_obj);
+        my_read_service.add(my_obj);
         }
         // my_service.add(objs_list);
         // let vec_objs = my_service.read(0, 10);
         // println!("{:?}", vec_objs);  
-        let my_structure_size = size_of::<MyStruct>();
-        let my_vec_structure_size = size_of::<Vec<MyStruct>>();
+        let my_structure_size = size_of::<ExampleStruct>();
+        let my_vec_structure_size = size_of::<Vec<ExampleStruct>>();
         let my_string_size = size_of::<String>();
         let my_str_size = size_of::<&str>();
         let my_char_size = size_of::<char>();
@@ -330,7 +377,7 @@ struct IntStruct {id: i32}
         // assert!(false);
     }
     #[test]
-    fn test_read_bulk() {
+    fn no_test_read_no_bulk1() {
         // 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
         #[derive(Serialize, Deserialize, Default, Debug, Clone)]
         struct MyStruct {
@@ -358,11 +405,60 @@ struct IntStruct {id: i32}
         objs_list.push(my_obj.clone());
         // my_read_service.add(my_obj);
         }
-        let objs = my_read_service.read_bulk(3, 40);
-        println!("{:?}", objs);
-
-
+        let objs = my_read_service.read_bulk(3, 1000000);
+        // println!("{:?}", objs);
     }
     
+    #[test]
+    fn test_add_bulk() {
+        // 创建服务实例        
+        let write_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        let mut objs_list = std::vec::Vec::new();
+        for i in 0..10 {
+        let  i = 1;
+        // 示例添加对象
+        // let test_string = "hello, world!".to_string();
+        let my_obj = ExampleStruct {
+            my_number: i,
+            my_string: format!("hello, {i} world!").to_string(),
+            // my_string: "hello, world!".to_string(),
+            // my_boolean: true,
+        };
+        objs_list.push(my_obj.clone());
+        objs_list.push(my_obj.clone());
+        objs_list.push(my_obj.clone());
+        println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+        }
+        write_service.add_bulk(objs_list);
+            }
+            
+            #[test]
+    fn test_read_bulk() {
+        let read_service =ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        read_service.read_bulk(0, 10);
+    }
+    
+    #[test]
+    fn test_io_bulk() {
+        // 创建服务实例        
+        let io_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        let count = 1000000;
+        let mut objs_list = std::vec::Vec::new();
+        for i in 0..count {
+        let  i = 1;
+        // 示例添加对象
+        let my_obj = ExampleStruct {
+            my_number: i,
+            my_string: format!("hello, {i} world!").to_string(),
+        };
+        objs_list.push(my_obj.clone());
+        println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+        }
+        io_service.add_bulk(objs_list);
+        let objs = io_service.read_bulk(0, count );
+        assert_eq!(objs.len(), count);
+// assert_eq!(objs[count -1].my_number as usize, count);
+    }
+
 }
 
