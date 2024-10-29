@@ -54,7 +54,7 @@ where
     }
     
     /// 获取当前对象数量
-    fn get_length(&self) -> i32 {
+    pub fn get_length(&self) -> i32 {
         let structure_file_guard =self.structure_file.lock().unwrap(); 
         let buffer = structure_file_guard.read_in_file(0, LENGTH_MARKER_SIZE);
         // 确保 buffer 的长度至少为 4
@@ -108,16 +108,19 @@ where
         let mut buffer: Vec<u8> = vec![0; size_of_object * count];
         println!("length of buffer: {}", buffer.len());
         
-        let data: Vec<u8> = objs.par_iter()
+        // let data: Vec<u8> = objs.par_iter()
+        // .map(|obj| Self::serialize_object(obj))
+        // .flatten()
+        // .collect::<Vec<u8>>();
+
+let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
         .map(|obj| Self::serialize_object(obj))
-        // .map(|obj| 
-        .flatten()
-        .collect::<Vec<u8>>();
-        
-    // 填充缓冲区
+        .collect::<Vec<Vec<u8>>>();
+
     let mut current_position = 0;
-    for obj in &objs {
-        let serialized_obj = Self::serialize_object(obj);
+    for serialized_obj in &serialized_objs {
+    // for obj in &objs {
+        // let serialized_obj = Self::serialize_object(&obj);
         let serialized_size = serialized_obj.len();
 
         // 将序列化对象写入缓冲区
@@ -141,7 +144,7 @@ where
         // let offset = (4 + (index as usize * data.len())) as u64;
         let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
         println!("bulk write offset: {}",  offset);
-        println!("bulk write data length:{}", data.len());
+        // println!("bulk write data length:{}", data.len());
 
         let file_guard = self.structure_file.lock().unwrap();
         // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
@@ -169,7 +172,7 @@ where
             let count = objs.len(); 
             let index = *length;
             *length += count as i32;
-            *length += 1;
+            // *length += 1;
             self.save_length(*length);
             index
         };
@@ -249,118 +252,67 @@ fn get_item_size<T>() -> usize {
  # [cfg(test)]
 mod test {
     use super:: * ;
+    const  count: usize = 999999;
     
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
         struct ExampleStruct {
-            my_number: i32,
+            my_number: usize,
             my_string: String,
             // my_boolean: bool,
         }
         
-     # [test]
-    fn test_object_persist_on_disk_service() {
-
-// 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
-#[derive(Serialize, Deserialize, Default)]
-struct MyStruct {
-    id: i32,
-    name: String,
-}
-
-#[derive(Serialize, Deserialize, Default)]
-struct IntStruct {id: i32}
-
-        // 创建服务实例
-        let my_service = ObjectPersistOnDiskService:: < MyStruct > ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        let service = ObjectPersistOnDiskService:: < IntStruct > ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        // 示例添加对象
-        let obj = IntStruct {id:0};
-        let my_obj = MyStruct {
-            id: 0,
-            name: String::from("hello")
-        };
-        let my_obj2 = MyStruct {
-            id: 1,
-            name: String::from("hello")
-        };
-        service.add(obj);
-        my_service.add(my_obj);
-        my_service.add(my_obj2);
-
-        // 示例读取对象
-        // let read_obj = service.read_index(0);
-        // let read_obj1 = service.read_index(1);
-        // assert_eq!(read_obj.id, 0);
-        // assert_eq!(read_obj.name, "hello");
-        // println!("读取的对象: id={}, name={}", read_obj.id, read_obj.name);
-        // dbg!(read_obj.id);
-        // dbg!(read_obj.name);
-    }
     
     # [test]
-    fn test_write_performance() {
-        // 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
-        #[derive(Serialize, Deserialize, Default)]
-        struct MyStruct {
-            my_number: i32,
-            my_string: String,
-            my_boolean: bool,
-        }
-
+    fn test_write_one() {
         // 创建服务实例        
-        let my_service = ObjectPersistOnDiskService:: < MyStruct > ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        for i in 0..1000 {
+        let my_service = ObjectPersistOnDiskService:: < ExampleStruct > ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         // 示例添加对象
-        let my_obj = MyStruct {
+        let i = 1;
+        let my_obj = ExampleStruct {
             my_number: i,
             my_string: format!("hello, world!{i}").to_string(),
-            my_boolean:  i %4 ==0,
+            // my_boolean:  i %4 ==0,
         };
         my_service.add(my_obj);
-        }
-
     }
     
     
-# [test]
-    fn test_bulk_write() {
-        // 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
-        #[derive(Serialize, Deserialize, Default)]
-        struct MyStruct {
-            my_number: i32,
-            my_string: String,
-            my_boolean: bool,
-        }
+                #[test]
+    fn test_read_one() {
+        let read_service =ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        read_service.read(0, 10);
+    }
 
+
+    # [test]
+    fn test_write_bulk() {
         // 创建服务实例        
-        let my_service = ObjectPersistOnDiskService:: <Vec<MyStruct>> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        let my_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
-        for i in 0..1000000 {
+        for i in 0..count {
         // 示例添加对象
-        let my_obj = MyStruct {
+        let my_obj = ExampleStruct {
             my_number: i,
             my_string: format!("hello, world!{i}").to_string(),
-            my_boolean:  i %4 ==0,
+            // my_boolean:  i %4 ==0,
         };
         objs_list.push(my_obj);
         }
-        my_service.add(objs_list);
+        my_service.add_bulk(objs_list);
     }
 
     # [test]
-    fn test_read_one() {
-        // 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
-
+    fn test_size_of_struct() {
         let my_read_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
-        for i in 0..10 {
+        for i in 1..count {
         // 示例添加对象
         let my_obj = ExampleStruct {
             my_number: i,
             my_string: format!("hello, world!{i}").to_string(),
         };
         objs_list.push(my_obj.clone());
-        my_read_service.add(my_obj);
+        // my_read_service.add(my_obj);
         }
         // my_service.add(objs_list);
         // let vec_objs = my_service.read(0, 10);
@@ -376,56 +328,19 @@ struct IntStruct {id: i32}
         dbg!(my_structure_size, my_vec_structure_size, my_str_size, my_string_size, my_char_size, my_bool_size, objs);
         // assert!(false);
     }
-    #[test]
-    fn no_test_read_no_bulk1() {
-        // 示例对象结构，实现 `Serialize` 和 `Deserialize` 特征
-        #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-        struct MyStruct {
-            my_number: i32,
-            my_string: String,
-            // my_str: &'1 str,
-            // my_boolean: bool,
-        }
-
-        // 创建服务实例        
-        let my_service = ObjectPersistOnDiskService:: <Vec<MyStruct>> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        let my_read_service = ObjectPersistOnDiskService:: <MyStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        let mut objs_list = std::vec::Vec::new();
-        for i in 0..10 {
-        // 示例添加对象
-        let test_string = "hello, world!".to_string();
-        let my_obj = MyStruct {
-            my_number: i,
-            // my_string: format!("hello, world!{i}").to_string(),
-            // my_string: "hello, world!".to_string(),
-            my_string: test_string,
-            // my_str: "hello str",
-            // my_boolean: true,
-        };
-        objs_list.push(my_obj.clone());
-        // my_read_service.add(my_obj);
-        }
-        let objs = my_read_service.read_bulk(3, 1000000);
-        // println!("{:?}", objs);
-    }
     
     #[test]
     fn test_add_bulk() {
         // 创建服务实例        
         let write_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
-        for i in 0..10 {
-        let  i = 1;
-        // 示例添加对象
-        // let test_string = "hello, world!".to_string();
+        for i in 0..count {
+            // let i = 1;
         let my_obj = ExampleStruct {
             my_number: i,
-            my_string: format!("hello, {i} world!").to_string(),
-            // my_string: "hello, world!".to_string(),
-            // my_boolean: true,
+            // my_string: format!("hello, {i} world!").to_string(),
+            my_string: "hello, world!".to_string(),
         };
-        objs_list.push(my_obj.clone());
-        objs_list.push(my_obj.clone());
         objs_list.push(my_obj.clone());
         println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
         }
@@ -435,30 +350,37 @@ struct IntStruct {id: i32}
             #[test]
     fn test_read_bulk() {
         let read_service =ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        read_service.read_bulk(0, 10);
+        let objs = read_service.read_bulk(0, count);
+        println!("last read obj: {:?}", objs[objs.len() - 1]);
     }
     
     #[test]
     fn test_io_bulk() {
         // 创建服务实例        
         let io_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        let count = 1000000;
+
         let mut objs_list = std::vec::Vec::new();
         for i in 0..count {
-        let  i = 1;
         // 示例添加对象
+        let i =1;
         let my_obj = ExampleStruct {
             my_number: i,
             my_string: format!("hello, {i} world!").to_string(),
         };
         objs_list.push(my_obj.clone());
-        println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+        // println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
         }
         io_service.add_bulk(objs_list);
         let objs = io_service.read_bulk(0, count );
         assert_eq!(objs.len(), count);
-// assert_eq!(objs[count -1].my_number as usize, count);
+assert_eq!(objs[count - 1].my_number as usize, count - 1);
     }
-
+    
+    #[test]
+    fn test_get_length() {
+        let read_service =ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+        let length = read_service.get_length();
+        println!("length: {}", length);
+    }
 }
 

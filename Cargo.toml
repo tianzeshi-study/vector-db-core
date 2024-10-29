@@ -1,11 +1,11 @@
 [package]
-name = "vector-db"
+name = "vector-db-core"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "vector_db"
+name = "vector_db_core"
 crate-type = ["cdylib"]
 
 [dependencies]
