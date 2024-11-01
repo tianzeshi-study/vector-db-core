@@ -27,7 +27,10 @@ impl StringRepository {
     /// 获取文件的结束偏移量
     fn get_string_file_end_offset(file_access: &FileAccessService) -> u64 {
         let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
-        let offset = u64::from_le_bytes(buffer.try_into().unwrap());
+        println!("buffer in string repository : {} ", &buffer.len());
+        let offset = 4;
+        // let offset = u64::from_le_bytes(buffer.try_into().unwrap());
+        // let offset = u64::from_le_bytes(buffer.try_into().unwrap());
         if offset <= END_OFFSET_SIZE as u64 {
             END_OFFSET_SIZE as u64
         } else {

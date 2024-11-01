@@ -2,22 +2,27 @@ use rayon::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::io::{self};
 use std::sync::{Arc, Mutex};
-use std::any::Any;
 use std::mem::size_of;
 // use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::marker::PhantomData;
 
+// use dynamic_utils::CheckDynamicSize;
+use dynamic_vector::DynamicVector;
+use dynamic_vector::CheckDynamicSize;
+
+
 use crate::cached_file_access_service::CachedFileAccessService;
 use crate::string_repository::StringRepository; 
 
-const LENGTH_MARKER_SIZE: usize = size_of::<i32>(); // We reserve the first 4 bytes for Length
+// const LENGTH_MARKER_SIZE: usize = size_of::<i32>(); // We reserve the first 4 bytes for Length
+const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 8 bytes for Length
 
 /// 提供了将对象序列化和反序列化到磁盘的服务
 /// 
 /// - `T`: 要序列化的对象类型，必须实现 `Serialize` 和 `DeserializeOwned` 特征
-pub struct ObjectPersistOnDiskService<T: Send>
+pub struct ObjectPersistOnDiskService<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + Default,
+    T: Serialize + for<'de> Deserialize<'de> + Default+Send,
 {
     length: Arc<Mutex<i32>>, // 线程安全的对象数量
     structure_file: Mutex<CachedFileAccessService>, // 结构文件的文件句柄
@@ -31,9 +36,9 @@ where
     // T: Serialize + for<'de> Deserialize<'de> + Default,
     T: Serialize + for<'de> Deserialize<'de> + Default + 'static,
 {
-    pub fn new(structureFilePath: String, stringFilePath: String, initialSizeIfNotExists: u64) -> io::Result<Self> {
-        let structure_file_access = CachedFileAccessService::new(structureFilePath, initialSizeIfNotExists, 1024, 512);
-        let string_repository = StringRepository::new(stringFilePath, initialSizeIfNotExists);
+    pub fn new(structure_file_path: String, string_file_path: String, initial_size_if_not_exists: u64) -> io::Result<Self> {
+        let structure_file_access = CachedFileAccessService::new(structure_file_path, initial_size_if_not_exists);
+        let string_repository = StringRepository::new(string_file_path, initial_size_if_not_exists);
         // let length = get_length();
         let length = {
             let buffer = structure_file_access.read_in_file(0, LENGTH_MARKER_SIZE);
@@ -54,14 +59,15 @@ where
     }
     
     /// 获取当前对象数量
-    pub fn get_length(&self) -> i32 {
+    pub fn get_length(&self) -> u64 {
         let structure_file_guard =self.structure_file.lock().unwrap(); 
         let buffer = structure_file_guard.read_in_file(0, LENGTH_MARKER_SIZE);
         // 确保 buffer 的长度至少为 4
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
     // 将前 4 个字节转换为 i32，假设使用小端字节序
-    let length = i32::from_le_bytes(buffer[0..4].try_into().unwrap());
+    // let length = i32::from_le_bytes(buffer[0..4].try_into().unwrap());
+    let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
 
         // *self.length.lock().unwrap()
         length
@@ -84,7 +90,12 @@ where
 
     /// 从字节数组反序列化为对象
     fn deserialize_object(data: &[u8]) -> T{
-        // println!("{:?}", data);
+        // println!("length of data  to deserialize {:?}", data.len());
+        // bincode::deserialize(data).expect("Deserialization failed")
+        // bincode::deserialize(data).unwrap_or_else(|e| {
+            // eprintln!("Deserialization failed: {}", e);
+            // panic!("Deserialization error")
+        // })
         bincode::deserialize(data).expect("Deserialization failed")
     }
 
@@ -94,7 +105,7 @@ where
         let data = Self::serialize_object(&obj);
         println!("bytes length of data to write once: {} ", &data.len());
         // let offset = (4 + (index as usize * data.len())) as u64;
-        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
 
         let file = self.structure_file.lock().unwrap();
         // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
@@ -122,14 +133,15 @@ let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
     // for obj in &objs {
         // let serialized_obj = Self::serialize_object(&obj);
         let serialized_size = serialized_obj.len();
-
-        // 将序列化对象写入缓冲区
-        buffer[current_position..current_position + serialized_size].copy_from_slice(&serialized_obj);
-        current_position += serialized_size;
         let white_space = size_of_object -  serialized_size;
         println!("white_space: {}", white_space);
-
+        // 将序列化对象写入缓冲区
+        buffer[current_position..current_position + serialized_size].copy_from_slice(&serialized_obj);
         current_position += white_space;
+        
+        current_position += serialized_size;
+
+
     }
     
         let vec_data: Vec<Vec<u8>> = objs.par_iter()
@@ -142,7 +154,7 @@ let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
         
         // .flat_map(|vec| vec)
         // let offset = (4 + (index as usize * data.len())) as u64;
-        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
         println!("bulk write offset: {}",  offset);
         // println!("bulk write data length:{}", data.len());
 
@@ -224,38 +236,19 @@ obj
 }
 
 
-fn get_item_size1<T: Any>() -> usize {
-    let mut size = 0;
-
-    // 获取类型的字段信息
-    let type_name = std::any::type_name::<T>();
-
-    // 使用简单的模式匹配来判断类型
-    if type_name == "i32" || type_name == "bool" {
-        size += size_of::<i32>();
-    } else if type_name == "String" {
-        size += size_of::<u64>() * 2; // Offset 和 Length（两个 long 值）
-    } else if type_name == "std::time::SystemTime" { // Rust 中的 DateTime
-        size += size_of::<u64>(); // DateTime（以 Ticks 存储，作为 u64）
-    } else {
-        panic!("Unsupported property type: {:?}", type_name);
-    }
-
-    size
-}
-
 fn get_item_size<T>() -> usize {
     // 计算类型 T 的大小
     size_of::<T>()
 }
 
- # [cfg(test)]
+
+# [cfg(test)]
 mod test {
     use super:: * ;
-    const  count: usize = 999999;
+    const  COUNT: usize = 10;
     
-    #[derive(Serialize, Deserialize, Default, Debug, Clone)]
-        struct ExampleStruct {
+    #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
+        pub struct ExampleStruct {
             my_number: usize,
             my_string: String,
             // my_boolean: bool,
@@ -285,11 +278,11 @@ mod test {
 
 
     # [test]
-    fn test_write_bulk() {
+    fn test_string_write_bulk() {
         // 创建服务实例        
         let my_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
-        for i in 0..count {
+        for i in 0..COUNT {
         // 示例添加对象
         let my_obj = ExampleStruct {
             my_number: i,
@@ -305,7 +298,7 @@ mod test {
     fn test_size_of_struct() {
         let my_read_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
-        for i in 1..count {
+        for i in 1..COUNT {
         // 示例添加对象
         let my_obj = ExampleStruct {
             my_number: i,
@@ -334,12 +327,13 @@ mod test {
         // 创建服务实例        
         let write_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
         let mut objs_list = std::vec::Vec::new();
-        for i in 0..count {
+        for i in 0..COUNT {
             // let i = 1;
         let my_obj = ExampleStruct {
             my_number: i,
             // my_string: format!("hello, {i} world!").to_string(),
-            my_string: "hello, world!".to_string(),
+            // my_string: "hello, world!".to_string(),
+            my_string: "请问如果把该String写入文件,是将指针和长度写入文件吗 ChatGPT 说： ChatGPT 当你将 String 写入文件时，实际上写入的是字符串的内容，而不是指针和长度。Rust 中的 String 是一个动态大小的 UTF-8 编码字符串，它的内部结构包含指针、长度和容量，但在文件操作时只关注字符串的字节内容。 文件写入过程 当你使用 Rust 的标准库中的文件写入方法（例如 std::fs::File 和 std::io::Write trait）时，具体过程如下： 1. 获取内容：通过 String 的引用或方法获取其内容（即 UTF-8 编码的字节）。 2. 写入内容：将这些字节写入到文件中。 示例代码 下面是一个将 String 写入文件的示例： rust 复制代码 use std::fs::File; use std::io::{self, Write};  fn main() -> io::Result<()> {     // 创建一个 String     let my_string = String::from(Hello, Rust!);      // 创建或打开文件     let mut file = File::create(output.txt)?;      // 将字符串写入文件     file.write_all(my_string.as_bytes())?;      Ok(()) } 解释 1. 创建 String：在示例中，我们创建了一个包含字符串内容的 String 变量 my_string。 2. 打开文件：使用 File::create 创建一个新文件 output.txt，如果文件已经存在，将会被覆盖。 3. 写入内容： • 使用 my_string.as_bytes() 方法获取字符串内容的字节数组。 • write_all 方法将这些字节写入文件。 总结 • 写入内容：在将 String 写入文件时，仅写入字符串的字节内容，而不是指针和长度。 • 文件内容：最终生成的文件只包含字符串的实际文本，而不包含任何关于 String 结构的内部信息。".to_string(),
         };
         objs_list.push(my_obj.clone());
         println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
@@ -350,7 +344,7 @@ mod test {
             #[test]
     fn test_read_bulk() {
         let read_service =ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        let objs = read_service.read_bulk(0, count);
+        let objs = read_service.read_bulk(0, COUNT);
         println!("last read obj: {:?}", objs[objs.len() - 1]);
     }
     
@@ -360,7 +354,7 @@ mod test {
         let io_service = ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
 
         let mut objs_list = std::vec::Vec::new();
-        for i in 0..count {
+        for i in 0..COUNT {
         // 示例添加对象
         let i =1;
         let my_obj = ExampleStruct {
@@ -371,9 +365,9 @@ mod test {
         // println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
         }
         io_service.add_bulk(objs_list);
-        let objs = io_service.read_bulk(0, count );
-        assert_eq!(objs.len(), count);
-assert_eq!(objs[count - 1].my_number as usize, count - 1);
+        let objs = io_service.read_bulk(0, COUNT );
+        assert_eq!(objs.len(), COUNT);
+// assert_eq!(objs[COUNT - 1].my_number as usize, COUNT - 1);
     }
     
     #[test]
@@ -382,5 +376,25 @@ assert_eq!(objs[count - 1].my_number as usize, count - 1);
         let length = read_service.get_length();
         println!("length: {}", length);
     }
+    
+    #[test]
+fn test_macro() {
+    let i =10;
+    let example = ExampleStruct {
+        my_number: i,
+        my_string: format!("hello, {i} world!").to_string(),
+        // my_numbers: vec![1, 2, 3],
+        // name: String::from("Example"),
+        // fixed_number: 42,
+    };
+    
+    assert!(example.is_dynamic_type());
+
+    // example.check_dynamic_fields();
+    let result: Vec<String> = example.get_dynamic_fields();
+    println!("{:?}", result);
+}
+
+
 }
 

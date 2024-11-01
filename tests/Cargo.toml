@@ -1,0 +1,16 @@
+[package]
+name = "vector-db-tests"
+version = "0.1.0"
+# edition = { workspace = true }
+# license = { workspace = true }
+# publish = false
+
+[[test]]
+harness = true
+name = "integration_tests"
+path = "tests/lib.rs"
+
+
+
+[dependencies]
+dynamic-vector-macro = {path ="../tools/dynamic-vector-macro"} 

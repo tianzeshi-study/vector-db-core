@@ -1,19 +1,18 @@
 [package]
-name = "vector-db-core"
+name = "dynamic-vector-macro"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "vector_db_core"
-crate-type = ["cdylib"]
+name = "dynamic_vector_macro"
+# crate-type = ["cdylib"]
+proc-macro = true
 
 [dependencies]
-bincode = "1.3.3"
-byteorder = "1.5.0"
-pyo3 = "0.22.0"
+proc-macro2 = "1.0.89"
+quote = "1.0.37"
 rayon = "1.10.0"
 serde ={version="1.0.213", features = ["derive"] }
-
-
-dynamic-vector = {path ="./tools/dynamic-vector"} 
+syn = "2.0.85"
+# dynamic-vector = {path ="../dynamic-vector"} 

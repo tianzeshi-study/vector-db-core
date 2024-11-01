@@ -1,0 +1,7 @@
+[package]
+name = "dynamic-vector"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dynamic-vector-macro = {path ="../dynamic-vector-macro"} 

@@ -3,6 +3,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::file_access_service::FileAccessService;
 
+const PAGE_SIZE: usize = 2;
+const MAX_CACHE_ITEMS: usize = 512;
+
 /// 缓存文件访问服务，实现带缓存的文件读写，使用LRU缓存淘汰策略
 pub struct CachedFileAccessService {
     file_access_service: FileAccessService,
@@ -14,13 +17,13 @@ pub struct CachedFileAccessService {
 
 impl CachedFileAccessService {
     /// 创建一个 `CachedFileAccessService` 实例
-    pub fn new(path: String,initial_size_if_not_exists: u64, page_size: usize, max_cache_items: usize) -> Self {
+    pub fn new(path: String,initial_size_if_not_exists: u64) -> Self {
         Self {
             file_access_service: FileAccessService::new(path, initial_size_if_not_exists),
             cache: Arc::new(Mutex::new(HashMap::new())),
             lru_list: Arc::new(Mutex::new(LinkedList::new())),
-            page_size,
-            max_cache_items,
+            page_size: PAGE_SIZE,
+            max_cache_items: MAX_CACHE_ITEMS,
             // page_size: 1024 * 1024, // 默认值 1MB
             // max_cache_items: 512,    // 默认值 512
         }
@@ -50,32 +53,36 @@ impl CachedFileAccessService {
     /// 从文件的指定偏移量读取数据，并使用缓存提高读取效率
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
         let mut result = vec![0; length];
-        let mut current_offset = offset;
-        let mut result_offset = 0;
-        let mut remaining_length = length;
+        // let mut current_offset = offset;
+        // let mut current_offset = length ;
+        // dbg!(current_offset);
+        // let mut result_offset = 0;
+        // let mut remaining_length = length;
 
-        while remaining_length > 0 {
-            let page_offset = current_offset / self.page_size as u64;
-            let page_start = (current_offset % self.page_size as u64) as usize;
+        // while remaining_length > 0 {
+            // let page_offset = current_offset / self.page_size;
+            // let page_start = current_offset % self.page_size;
             // dbg!(current_offset, self.page_size);
-            // dbg!(page_offset, page_start);
-            let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
 
-            let page_data = self.get_page_from_cache(page_offset);
-            // dbg!(&page_data);
-            result[result_offset..result_offset + bytes_to_read]
-                .copy_from_slice(&page_data[page_start..page_start + bytes_to_read]);
+            // let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
 
-            current_offset += bytes_to_read as u64;
-            result_offset += bytes_to_read;
-            remaining_length -= bytes_to_read;
-        }
+            // let page_data = self.get_page_from_cache(offset, page_offset as u64);
+            // dbg!(&page_data.len());
+            // dbg!(result.len(), result_offset, bytes_to_read, page_start);
+            // result[result_offset..result_offset + bytes_to_read]
+                // .copy_from_slice(&page_data[page_start..page_start + bytes_to_read]);
 
-        result
+            // current_offset += bytes_to_read;
+            // result_offset += bytes_to_read;
+            // remaining_length -= bytes_to_read;
+        // }
+
+        // result
+         self.file_access_service.read_in_file(offset, length as usize)
     }
 
     /// 从缓存中获取页面数据，如果缓存缺失则从文件中读取并添加到缓存
-    fn get_page_from_cache(&self, page_offset: u64) -> Vec<u8> {
+    fn get_page_from_cache(&self, file_offset: u64, page_offset: u64) -> Vec<u8> {
         {
         let cache = self.cache.lock().unwrap();
         // let mut lru_list = self.lru_list.lock().unwrap();
@@ -91,8 +98,11 @@ impl CachedFileAccessService {
             return page_data.clone();
         }
         }
-
-        let page_data = self.file_access_service.read_in_file(page_offset * self.page_size as u64, self.page_size);
+        dbg!(page_offset , self.page_size);
+        // let page_data = self.file_access_service.read_in_file(file_offset, page_offset * self.page_size as u64);
+        let read_length = page_offset * self.page_size as u64;
+        dbg!(file_offset, read_length);
+        let page_data = self.file_access_service.read_in_file(file_offset, read_length as usize);
         self.add_to_cache(page_offset, page_data.clone());
         page_data
     }
@@ -148,13 +158,14 @@ mod tests {
 
     const TEST_FILE_PATH: &str = "test_file.bin";
     const INITIAL_SIZE_IF_NOT_EXISTS: u64 = 1024;
-    const PAGE_SIZE: usize = 1024; // 1KB 页面大小
-    const MAX_CACHE_ITEMS: usize = 4; // 最多缓存4个页面
+    // const PAGE_SIZE: usize = 1024; // 1KB 页面大小
+    // const MAX_CACHE_ITEMS: usize = 4; // 最多缓存4个页面
 
 
     fn test_write_and_read_in_file() {
         // 初始化文件缓存服务
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string() ,INITIAL_SIZE_IF_NOT_EXISTS,  PAGE_SIZE, MAX_CACHE_ITEMS);
+        // let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string() ,INITIAL_SIZE_IF_NOT_EXISTS,  PAGE_SIZE, MAX_CACHE_ITEMS);
+        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string() ,INITIAL_SIZE_IF_NOT_EXISTS);
         
         // 写入数据
         let offset = 0;
@@ -169,7 +180,7 @@ mod tests {
 
     fn test_cache_eviction() {
         // 测试缓存淘汰策略
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS, PAGE_SIZE, MAX_CACHE_ITEMS);
+        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
 
         // 写入多个页面数据
         for i in 0..(MAX_CACHE_ITEMS + 1) as u64 {
@@ -187,7 +198,7 @@ mod tests {
 
     fn test_cache_hit() {
         // 测试缓存命中率
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS,  PAGE_SIZE, MAX_CACHE_ITEMS);
+        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
 
         // 写入并读取相同的页面，验证缓存命中
         let offset = 0;
@@ -210,7 +221,7 @@ mod tests {
 
     fn test_lru_cache_behavior() {
         // 测试 LRU 缓存行为
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS, PAGE_SIZE, MAX_CACHE_ITEMS);
+        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
 
         // 写入多个页面数据
         for i in 0..MAX_CACHE_ITEMS as u64 {
