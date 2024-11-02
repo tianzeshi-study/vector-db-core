@@ -107,22 +107,38 @@ where
 
     /// 将对象写入指定索引位置
     fn write_index(&self, index: i64, obj: T) {
+        let mut data: Vec<u8> = Vec::new();
+        let offset;
         if !obj.is_dynamic_structure() {
         let size_of_object = get_item_size::<T>();
-        let data = Self::serialize_object(&obj);
+        // let data = Self::serialize_object(&obj);
+        data = Self::serialize_object(&obj);
         println!("bytes length of data to write once: {} ", &data.len());
         // let offset = (4 + (index as usize * data.len())) as u64;
-        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        // let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
 
-        let file = self.structure_file.lock().unwrap();
+        // let file = self.structure_file.lock().unwrap();
         // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
         // file.write_all(&data).expect("Write failed.");
-        file.write_in_file(offset, &data);
+        // file.write_in_file(offset, &data);
         } else {
             let size_of_object = get_item_size::<T>();
             let file = self.structure_file.lock().unwrap();
-            self.save_object_dynamic(vec![obj]);
+            let obj_with_persisted_dynamic  = self.save_object_dynamic(vec![obj]);
+            
+            let size_of_value_object = get_item_size::<Value>();
+            dbg!(size_of_value_object);
+            // let data = Self::serialize_object(&obj_with_persisted_dynamic);
+            let data = bincode::serialize(&obj_with_persisted_dynamic).expect("Serialization failed");
+            println!("bytes length of dynamic data to write once: {} ", &data.len());
+
+            // let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            
         }
+            let file_guard = self.structure_file.lock().unwrap();
+            file_guard.write_in_file(offset, &data);
     }
     
     fn bulk_write_index(&self, index: i64, objs: Vec<T>) {
@@ -251,7 +267,7 @@ obj
     }
     
     // save_object_dynamic(&self, objs: Vec<T>) -> Vec<string_repository::ObjectWithPersistedDynamic<T>> {
-    fn save_object_dynamic(&self, objs: Vec<T>)  {
+    fn save_object_dynamic(&self, objs: Vec<T>) -> Vec<Value>{
         let  dynamic_fields: Vec<String> =  objs[0].get_dynamic_fields();
         let  dynamic_fields_count = dynamic_fields.len();
         println!("dynamic_fields: {:?}, dynamic_fields_count: {}", dynamic_fields, dynamic_fields_count);
@@ -275,7 +291,8 @@ let mut json_objs: Vec<_> = objs.par_iter()
         // .map( |field| {
         .for_each(move  |field| {
         // let mut field_obj_len_list: Vec<usize> = vec![0; arc_objs_clone.len()];
-        let mut field_obj_len_list: Vec<usize> = vec![0; arc_objs_clone.lock().unwrap().len()];
+        // let mut field_obj_len_list: Vec<usize> = vec![0; arc_objs_clone.lock().unwrap().len()];
+        let mut field_obj_len_list: Vec<usize> = Vec::new();
         // let field_string_list: Vec<String> =  objs.par_iter()
     // let  mut json_objs: Vec<Value> = objs.par_iter()
     // json_objs = objs.par_iter()
@@ -307,6 +324,8 @@ let mut json_objs: Vec<_> = objs.par_iter()
      .for_each(|obj| {
          field_obj_len_list.push(obj.len());
      });
+     dbg!(&field_string_list);
+     
      let field_string = field_string_list.iter()
      .cloned()
      .map(|obj| obj.to_string())
@@ -332,9 +351,10 @@ for i in 0..objs.len() {
 
     if let Some(dynamic_obj_value) = arc_objs_value_clone.lock().unwrap()[i].get_mut(field.clone()) {
         let offset_and_total_length = vec![current_offset, current_offset + field_obj_len_list[i] as u64];
-        dbg!(&field_obj_len_list[i]);
+        dbg!(&field_obj_len_list, &field_obj_len_list[i]);
         println!("offset_and_total_length: {:?}", &offset_and_total_length);
         *dynamic_obj_value = offset_and_total_length.into();
+        dbg!(&dynamic_obj_value);
         current_offset +=  field_obj_len_list[i] as u64;
     } else {
         println!("no value!");
@@ -345,6 +365,9 @@ for i in 0..objs.len() {
 });
 // .flatten()
 // .collect::<Vec<_>>();
+let obj_with_persisted_dynamic = arc_objs_value.lock().unwrap().clone();
+dbg!(&obj_with_persisted_dynamic);
+obj_with_persisted_dynamic
     }
     
 }
