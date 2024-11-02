@@ -18,15 +18,29 @@ pub struct ObjectWithPersistedDynamic<T> {
 /// `StringRepository` 用于存储和读取字符串
 pub struct StringRepository {
     file_access: FileAccessService,
-    file_end_offset: u64,
+    file_end_offset: Arc<Mutex<u64>>,
     expand_size_lock: Arc<Mutex<()>>,
 }
 
 impl StringRepository {
     /// 初始化 `StringRepository`，并设置文件结束偏移量
     pub fn new(string_file_path: String, initial_size_if_not_exists: u64) -> Self {
-        let file_access = FileAccessService::new(string_file_path, initial_size_if_not_exists);
-        let file_end_offset = Self::get_string_file_end_offset(&file_access);
+        let file_access = FileAccessService::new(string_file_path.clone(), initial_size_if_not_exists);
+        println!("string repository initial_size_if_not_exists: {}, path: {:?}", initial_size_if_not_exists, string_file_path);
+        // let file_end_offset = Self::get_string_file_end_offset(&file_access);
+        // let file_end_offset = Self::get_string_file_end_offset();
+        
+        let file_end_offset = {
+            let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
+            assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
+
+            let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
+
+            Arc::new(Mutex::new(length))
+        };
+        
+        // println!("file_end_offset: {:?}", file_end_offset);
+        
         Self {
             file_access,
             file_end_offset,
@@ -36,10 +50,12 @@ impl StringRepository {
 
     /// 获取文件的结束偏移量
     fn get_string_file_end_offset(file_access: &FileAccessService) -> u64 {
+    // fn get_string_file_end_offset(&self) -> u64 {
         let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
+        // let buffer = self.file_access.read_in_file(0, END_OFFSET_SIZE);
         println!("buffer in string repository : {} ", &buffer.len());
-        let offset = 4;
-        // let offset = u64::from_le_bytes(buffer.try_into().unwrap());
+        // let offset = 8;
+        let offset = u64::from_le_bytes(buffer.try_into().unwrap());
         // let offset = u64::from_le_bytes(buffer.try_into().unwrap());
         if offset <= END_OFFSET_SIZE as u64 {
             END_OFFSET_SIZE as u64
@@ -50,28 +66,19 @@ impl StringRepository {
 
     /// 写入字符串内容并返回其偏移量和长度
     pub fn write_string_content_and_get_offset(&mut self, bytes_vector: Vec<u8>) -> (u64, u64) {
-        // let str  = Some(&vector);
-        // let void_string = "".to_string();
-        // match str {
-            // Some("".to_string()) => (-1, 0),
-            // Some(&void_string) => (-1, 0), 
-            // Some() => (-1, 0),
-            // None => (-2, 0),
-            // Some(s) => {
-                // let string_bytes = vector;
-                let current_offset;
-                {
-                    // 使用锁防止文件扩展的并发问题
-                    let _lock = self.expand_size_lock.lock().unwrap();
-                    current_offset = self.file_end_offset;
-                    // self.file_end_offset += string_bytes.len() as u64;
-                    self.file_end_offset += bytes_vector.len() as u64;
-                }
+                // let current_offset;
+                let current_offset = self.file_end_offset.lock().unwrap().clone();
                 self.file_access.write_in_file(current_offset, &bytes_vector);
-                self.file_access.write_in_file(0, &self.file_end_offset.to_le_bytes());
-                (current_offset as u64,current_offset + bytes_vector.len() as u64)
-            // }
-        // }
+                // {
+                    // 使用锁防止文件扩展的并发问题
+                    // let _lock = self.expand_size_lock.lock().unwrap();
+                    *self.file_end_offset.lock().unwrap() += bytes_vector.len() as u64;
+                    // current_offset = self.file_end_offset.lock().unwrap();
+                    // self.file_end_offset += string_bytes.len() as u64;
+                // }
+                // self.file_access.write_in_file(*current_offset, &bytes_vector);
+                self.file_access.write_in_file(0, &self.file_end_offset.lock().unwrap().to_le_bytes());
+                (current_offset as u64, current_offset + bytes_vector.len() as u64)
     }
 
     /// 根据偏移量和长度加载字符串内容
