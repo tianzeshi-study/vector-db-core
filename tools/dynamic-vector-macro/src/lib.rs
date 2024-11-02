@@ -74,7 +74,7 @@ impl DynamicSized for bool {fn is_dynamic_size(&self) -> bool {false}}
 
         impl DynamicVector for #name {
 
-            fn is_dynamic_type(&self) -> bool {
+            fn is_dynamic_structure(&self) -> bool {
                 let check = self.get_dynamic_fields();
                 if   check.len() != 0 {
                     return true;

@@ -1,5 +1,6 @@
 use rayon::prelude::*;
 use serde::{Serialize, Deserialize};
+// use serde_json::Value;
 use std::io::{self};
 use std::sync::{Arc, Mutex};
 use std::mem::size_of;
@@ -24,9 +25,11 @@ pub struct ObjectPersistOnDiskService<T>
 where
     T: Serialize + for<'de> Deserialize<'de> + Default+Send,
 {
-    length: Arc<Mutex<i32>>, // 线程安全的对象数量
+    length: Arc<Mutex<i32>>, 
     structure_file: Mutex<CachedFileAccessService>, // 结构文件的文件句柄
-    string_repository: StringRepository,
+    // string_repository: StringRepository,
+    dynamic_repository_dir:  String,
+    initial_size_if_not_exists: u64,
     _marker: PhantomData<T>, // 用于存储对象类型的占位符
 }
 
@@ -34,11 +37,12 @@ where
 impl<T: Send+Sync> ObjectPersistOnDiskService<T>
 where
     // T: Serialize + for<'de> Deserialize<'de> + Default,
-    T: Serialize + for<'de> Deserialize<'de> + Default + 'static,
+    T: Serialize + for<'de> Deserialize<'de> + Default + 'static+ DynamicVector,
 {
     pub fn new(structure_file_path: String, string_file_path: String, initial_size_if_not_exists: u64) -> io::Result<Self> {
         let structure_file_access = CachedFileAccessService::new(structure_file_path, initial_size_if_not_exists);
-        let string_repository = StringRepository::new(string_file_path, initial_size_if_not_exists);
+        std::fs::create_dir_all(&string_file_path);
+        // let string_repository = StringRepository::new(string_file_path.clone(), initial_size_if_not_exists);
         // let length = get_length();
         let length = {
             let buffer = structure_file_access.read_in_file(0, LENGTH_MARKER_SIZE);
@@ -53,7 +57,9 @@ where
         Ok(Self {
             length,
             structure_file: Mutex::new(structure_file_access),
-            string_repository: string_repository,
+            // string_repository: string_repository,
+            dynamic_repository_dir: string_file_path,
+            initial_size_if_not_exists: initial_size_if_not_exists,
             _marker: PhantomData,
         })
     }
@@ -168,6 +174,7 @@ let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
 
     /// 添加单个对象
     pub fn add(&self, obj: T) {
+        if !obj.is_dynamic_structure() {
         let index_to_write = {
             let mut length = self.length.lock().unwrap();
             let index = *length;
@@ -176,6 +183,11 @@ let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
             index
         };
         self.write_index(index_to_write.into(), obj);
+        } else {
+            let  dynamic_fields: Vec<String> = obj.get_dynamic_fields();
+            println!("dynamic fields: {:?}", dynamic_fields); 
+            panic! ("dynamic  type");
+        }
     }
     
     pub fn add_bulk(&self, objs: Vec<T>) {
@@ -230,9 +242,44 @@ obj
         
         objs
     }
+    
+    // save_object_dynamic(&self, objs: Vec<T>) -> Vec<string_repository::ObjectWithPersistedDynamic<T>> {
+    fn save_object_dynamic(&self, objs: Vec<T>)  {
+        let  dynamic_fields: Vec<String> =  objs[0].get_dynamic_fields();
+        let  dynamic_fields_count = dynamic_fields.len();
 
+        let total_dynamic_fields_count = dynamic_fields_count * objs.len();
+        let mut dynamic_bytes:Vec<u8> = vec![0;total_dynamic_fields_count];
 
-
+        dynamic_fields.par_iter()
+        .map( |field| {
+        let mut field_obj_len: Vec<usize> = vec![0; objs.len()];
+        let field_string_list: Vec<String> =  objs.par_iter()
+     .map( |obj| serde_json::to_value(obj).unwrap())
+     // .map(|obj| obj.get(field.clone()))
+     // .filter_map( |x| x)
+     // .cloned()
+     .filter_map(|obj| obj.get(field.clone()).cloned()) // 使用 cloned() 获得所有权
+     .map(|x| x.to_string())
+     .collect::<Vec<String>>();
+     
+     field_string_list.iter()
+     .for_each(|obj| {
+         field_obj_len.push(obj.len());
+     });
+     let field_string = field_string_list.iter().cloned().collect::<String>();
+     
+let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
+std::fs::File::create(file_path.clone());
+let file_path_str = file_path.to_string_lossy().into_owned();
+let mut string_repository = StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
+let byte_vector: Vec<u8> = field_string.as_bytes().to_vec();
+let (offset, total_length ) = string_repository.write_string_content_and_get_offset(byte_vector);
+field
+})
+.collect::<Vec<_>>();
+    }
+    
 }
 
 
@@ -241,7 +288,7 @@ fn get_item_size<T>() -> usize {
     size_of::<T>()
 }
 
-
+ 
 # [cfg(test)]
 mod test {
     use super:: * ;
@@ -331,9 +378,9 @@ mod test {
             // let i = 1;
         let my_obj = ExampleStruct {
             my_number: i,
-            // my_string: format!("hello, {i} world!").to_string(),
+            my_string: format!("hello, {i} world!").to_string(),
             // my_string: "hello, world!".to_string(),
-            my_string: "请问如果把该String写入文件,是将指针和长度写入文件吗 ChatGPT 说： ChatGPT 当你将 String 写入文件时，实际上写入的是字符串的内容，而不是指针和长度。Rust 中的 String 是一个动态大小的 UTF-8 编码字符串，它的内部结构包含指针、长度和容量，但在文件操作时只关注字符串的字节内容。 文件写入过程 当你使用 Rust 的标准库中的文件写入方法（例如 std::fs::File 和 std::io::Write trait）时，具体过程如下： 1. 获取内容：通过 String 的引用或方法获取其内容（即 UTF-8 编码的字节）。 2. 写入内容：将这些字节写入到文件中。 示例代码 下面是一个将 String 写入文件的示例： rust 复制代码 use std::fs::File; use std::io::{self, Write};  fn main() -> io::Result<()> {     // 创建一个 String     let my_string = String::from(Hello, Rust!);      // 创建或打开文件     let mut file = File::create(output.txt)?;      // 将字符串写入文件     file.write_all(my_string.as_bytes())?;      Ok(()) } 解释 1. 创建 String：在示例中，我们创建了一个包含字符串内容的 String 变量 my_string。 2. 打开文件：使用 File::create 创建一个新文件 output.txt，如果文件已经存在，将会被覆盖。 3. 写入内容： • 使用 my_string.as_bytes() 方法获取字符串内容的字节数组。 • write_all 方法将这些字节写入文件。 总结 • 写入内容：在将 String 写入文件时，仅写入字符串的字节内容，而不是指针和长度。 • 文件内容：最终生成的文件只包含字符串的实际文本，而不包含任何关于 String 结构的内部信息。".to_string(),
+            // my_string: "请问如果把该String写入文件,是将指针和长度写入文件吗 ChatGPT 说： ChatGPT 当你将 String 写入文件时，实际上写入的是字符串的内容，而不是指针和长度。Rust 中的 String 是一个动态大小的 UTF-8 编码字符串，它的内部结构包含指针、长度和容量，但在文件操作时只关注字符串的字节内容。 文件写入过程 当你使用 Rust 的标准库中的文件写入方法（例如 std::fs::File 和 std::io::Write trait）时，具体过程如下： 1. 获取内容：通过 String 的引用或方法获取其内容（即 UTF-8 编码的字节）。 2. 写入内容：将这些字节写入到文件中。 示例代码 下面是一个将 String 写入文件的示例： rust 复制代码 use std::fs::File; use std::io::{self, Write};  fn main() -> io::Result<()> {     // 创建一个 String     let my_string = String::from(Hello, Rust!);      // 创建或打开文件     let mut file = File::create(output.txt)?;      // 将字符串写入文件     file.write_all(my_string.as_bytes())?;      Ok(()) } 解释 1. 创建 String：在示例中，我们创建了一个包含字符串内容的 String 变量 my_string。 2. 打开文件：使用 File::create 创建一个新文件 output.txt，如果文件已经存在，将会被覆盖。 3. 写入内容： • 使用 my_string.as_bytes() 方法获取字符串内容的字节数组。 • write_all 方法将这些字节写入文件。 总结 • 写入内容：在将 String 写入文件时，仅写入字符串的字节内容，而不是指针和长度。 • 文件内容：最终生成的文件只包含字符串的实际文本，而不包含任何关于 String 结构的内部信息。".to_string(),
         };
         objs_list.push(my_obj.clone());
         println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
@@ -388,7 +435,7 @@ fn test_macro() {
         // fixed_number: 42,
     };
     
-    assert!(example.is_dynamic_type());
+    assert!(example.is_dynamic_structure());
 
     // example.check_dynamic_fields();
     let result: Vec<String> = example.get_dynamic_fields();
