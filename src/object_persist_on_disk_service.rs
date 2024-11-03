@@ -37,7 +37,7 @@ where
 impl<T: Send+Sync> ObjectPersistOnDiskService<T>
 where
     // T: Serialize + for<'de> Deserialize<'de> + Default,
-    T: Serialize + for<'de> Deserialize<'de> + Default + 'static+ DynamicVector,
+    T: Serialize + for<'de> Deserialize<'de> + Default + 'static+ DynamicVector +std::fmt::Debug,
 {
     pub fn new(structure_file_path: String, string_file_path: String, initial_size_if_not_exists: u64) -> io::Result<Self> {
         let structure_file_access = CachedFileAccessService::new(structure_file_path, initial_size_if_not_exists);
@@ -107,38 +107,41 @@ where
 
     /// 将对象写入指定索引位置
     fn write_index(&self, index: i64, obj: T) {
-        let mut data: Vec<u8> = Vec::new();
-        let offset;
+
+
         if !obj.is_dynamic_structure() {
         let size_of_object = get_item_size::<T>();
-        // let data = Self::serialize_object(&obj);
-        data = Self::serialize_object(&obj);
-        println!("bytes length of data to write once: {} ", &data.len());
-        // let offset = (4 + (index as usize * data.len())) as u64;
-        // let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
-        offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        let data = Self::serialize_object(&obj);
 
-        // let file = self.structure_file.lock().unwrap();
+        println!("bytes length of data to write once: {} ", &data.len());
+
+
+        let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+
         // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
         // file.write_all(&data).expect("Write failed.");
-        // file.write_in_file(offset, &data);
+        let file = self.structure_file.lock().unwrap();
+        file.write_in_file(offset, &data);
         } else {
             let size_of_object = get_item_size::<T>();
-            let file = self.structure_file.lock().unwrap();
-            let obj_with_persisted_dynamic  = self.save_object_dynamic(vec![obj]);
+
+            let objs_with_persisted_dynamic  = self.save_object_dynamic(vec![obj]);
+            // dbg!(&objs_with_persisted_dynamic);
             
             let size_of_value_object = get_item_size::<Value>();
-            dbg!(size_of_value_object);
-            // let data = Self::serialize_object(&obj_with_persisted_dynamic);
-            let data = bincode::serialize(&obj_with_persisted_dynamic).expect("Serialization failed");
+            // dbg!(size_of_value_object);
+            let dyna_obj:T =serde_json::from_value(objs_with_persisted_dynamic[0].clone()).unwrap();
+            let data = bincode::serialize(&dyna_obj).expect("Serialization failed");
+            // let data = Self::serialize_object(&obj_with_persisted_dynamic[0]);
+            // let data = bincode::serialize(&obj_with_persisted_dynamic).expect("Serialization failed");
+            // let data: Vec<u8> = serde_json::to_vec(&obj_with_persisted_dynamic).unwrap();
             println!("bytes length of dynamic data to write once: {} ", &data.len());
 
-            // let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
-            offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
-            
-        }
+            let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+
             let file_guard = self.structure_file.lock().unwrap();
-            file_guard.write_in_file(offset, &data);
+                        file_guard.write_in_file(offset, &data);
+        }
     }
     
     fn bulk_write_index(&self, index: i64, objs: Vec<T>) {
@@ -227,25 +230,36 @@ let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
         self.bulk_write_index(index_to_write.into(), objs);
     }
     
-    pub fn read(&self, index: usize, count: usize) -> T{
+    pub fn read(&self, index: usize) -> T{
         let size_of_object = get_item_size::<T>();
-        // let offset = (4 + (index as usize * data.len())) as u64;
         let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        // let offset   = 0;
         println!("read offset:{}", offset);
 
-        let file_guard = self.structure_file.lock().unwrap();
-        let length = count*size_of_object;
+        // let length = size_of_object;
+        let length = 36;
         println!("read length:{}", length);
+        let file_guard = self.structure_file.lock().unwrap();
         let  data: Vec<u8> = file_guard.read_in_file(offset, length);
         dbg!(&data.len());
-        let obj = Self::deserialize_object(&data);
+        // let obj = Self::deserialize_object(&data);
+        let obj: T = bincode::deserialize(&data).expect("Deserialization failed");
+        println!("{:?}", obj);
+        if !obj.is_dynamic_structure() {
+            return obj;
+        } else {
 
+            // let obj: Vec<Value> = serde_json::from_slice(&data);
+            let value_obj = serde_json::from_slice(&data).unwrap();
+            let decoded_objs: Vec<Value> = self.load_object_dynamic(value_obj);
+            // let decoded_objs: Vec<Value> = self.load_object_dynamic(vec![obj]);
+            let decoded_obj = decoded_objs[0].clone();
+            let result_obj = serde_json::from_value(decoded_obj).unwrap();
 
-        
-        // let buffer: [u8; std::mem::size_of::<i32>()] = length.to_ne_bytes();
-        // let file_guard = self.structure_file.lock().unwrap();
-        // file_guard.read_in_file(0, &buffer);
-obj
+            return result_obj;
+        }
+
+// obj
     }
     
     pub fn read_bulk(&self, index: usize, count: usize) -> Vec<T>{
@@ -304,8 +318,14 @@ let mut json_objs: Vec<_> = objs.par_iter()
     // *arc_objs_value_clone.lock().unwrap() = arc_objs_clone.lock().unwrap()
     let  field_string_list = arc_objs_clone.lock().unwrap()
      .par_iter()
-     .filter_map(|obj| obj.get(field.clone()).cloned())
-     .collect::<Vec<_>>();
+     .map(|obj| {
+         dbg!(obj);
+     obj.get(field.clone()).unwrap()
+     })
+     .map(|obj| obj.to_string())
+     .collect::<Vec<String>>();
+     // .filter_map(|obj| obj.get(field.clone()).cloned())
+     // .collect::<Vec<_>>();
      // dbg!(arc_objs_value_clone.lock().unwrap());
      
      
@@ -320,7 +340,7 @@ let mut json_objs: Vec<_> = objs.par_iter()
      dbg!(&field_string_list);
      
      field_string_list.iter()
-     .map(|obj| obj.to_string())
+     // .map(|obj| obj.to_string())
      .for_each(|obj| {
          field_obj_len_list.push(obj.len());
      });
@@ -339,7 +359,8 @@ let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.cl
 
 let file_path_str = file_path.to_string_lossy().into_owned();
 let mut  string_repository = StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
-let byte_vector: Vec<u8> = field_string.as_bytes().to_vec();
+// let byte_vector: Vec<u8> = field_string.as_bytes().to_vec();
+let byte_vector: Vec<u8> = bincode::serialize(&field_string).expect("Serialization failed");
 let (offset, total_length ) = string_repository.write_string_content_and_get_offset(byte_vector);
 // let obj_with_persisted_dynamic = objs.iter() 
 // field_obj_len_list.iter().map(|length|{  field
@@ -370,6 +391,124 @@ dbg!(&obj_with_persisted_dynamic);
 obj_with_persisted_dynamic
     }
     
+    fn load_object_dynamic(&self, objs: Vec<T>) -> Vec<Value>{
+    // fn load_object_dynamic(&self, objs: Vec<Value>) -> Vec<Value>{
+        let  dynamic_fields: Vec<String> =  objs[0].get_dynamic_fields();
+        let  dynamic_fields_count = dynamic_fields.len();
+        println!("dynamic_fields: {:?}, dynamic_fields_count: {}", dynamic_fields, dynamic_fields_count);
+
+        let total_dynamic_fields_count = dynamic_fields_count * objs.len();
+        let objs_len = objs.len();
+        let mut dynamic_bytes:Vec<u8> = vec![0;total_dynamic_fields_count];
+        println!("origin objs, {:?}", &objs);
+             
+let mut json_objs: Vec<Value> = objs.par_iter()
+     .map( |obj| serde_json::to_value(obj).unwrap())
+     .collect();
+
+     println!("json_objs, {:?}", json_objs);
+
+     let objs_value: Vec<_> =Vec::new();
+     
+     let arc_objs = Arc::new(Mutex::new(json_objs));
+     let arc_objs_clone = Arc::clone(&arc_objs);
+     
+     let arc_objs_value = Arc::new(Mutex::new(objs_value));
+     let arc_objs_value_clone = Arc::clone(&arc_objs_value);
+     
+        dynamic_fields.par_iter()
+        .for_each(move  |field| {
+
+        let mut field_obj_len_list: Vec<Vec<usize>> = Vec::new();
+    let  field_arguments_list: Vec<Vec<usize>> = arc_objs_clone.lock().unwrap()
+     .par_iter()
+     // .filter_map(|obj| obj.get(field.clone()).cloned())
+     // .filter_map(|obj| obj.get(field.clone()).unwrap())
+     .map(|obj| obj.get(field.clone()).unwrap())
+     .map( |obj| {
+         dbg!(obj);
+         serde_json::from_value(obj.clone()).unwrap()
+     })
+     .collect::<Vec<Vec<usize>>>();
+
+     *arc_objs_value_clone.lock().unwrap() = arc_objs_clone.lock().unwrap()
+     .par_iter()
+     .cloned()
+     .collect::<Vec<Value>>();
+
+     
+     field_arguments_list.iter()
+     // .map(|obj| {
+         // dbg!(obj);
+         // serde_json::from_value(obj.clone()).unwrap()
+     // })
+     // .cloned()
+     .for_each(|obj| {
+         // let number_obj = serde_json::from_value(obj).unwrap
+         field_obj_len_list.push(obj.to_vec());
+     });
+     dbg!(&field_arguments_list);
+     
+     // let field_string = field_string_list.iter()
+     // .cloned()
+     // .map(|obj| obj.to_string())
+     // .collect::<String>();
+     
+let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
+
+    // let file = std::fs::OpenOptions::new()
+        // .create_new(true)
+        // .open(file_path.clone());
+
+let file_path_str = file_path.to_string_lossy().into_owned();
+let mut  string_repository = StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
+// let byte_vector: Vec<u8> = field_string.as_bytes().to_vec();
+// let start_offset: usize = field_arguments_list[0][0];
+// let (offset, total_length ) = string_repository.write_string_content_and_get_offset(byte_vector);
+let start_offset: usize = field_obj_len_list[0][0];
+let total_length:usize = field_obj_len_list[field_arguments_list.len()][1];
+let string_bytes:Vec<u8> =  string_repository.load_string_content(start_offset as u64, total_length as u64);
+let string_objs: Vec<String> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
+dbg!(&string_objs);
+// string_objs.par_iter()
+// .map( |string_obj| String::from_utf8(string_obj).expect("Deserialization failed"))
+// .collect::<Vec<String>>();
+
+// for i in 0..objs.len() {
+// string_objs.par_iter()
+// .for_each(|string_obj| {
+    // for i in 0..string_objs.len() {
+    
+    let mut current_offset = 0;
+    for i in 0..objs_len {
+    if let Some(dynamic_obj_value) = arc_objs_value_clone.lock().unwrap()[i].get_mut(field.clone()) {
+        // let offset_and_total_length = vec![current_offset, current_offset + field_obj_len_list[i] as u64];
+        let offset_and_total_length = &field_obj_len_list[i];
+        let offset =  offset_and_total_length[0];
+        let total_length =  offset_and_total_length[1];
+        let string_bytes_len = total_length - offset;
+        let current_field_string_bytes  =   &string_bytes[current_offset..current_offset+string_bytes_len];
+        current_offset += string_bytes_len;
+        let current_field_string  = String::from_utf8(current_field_string_bytes.to_vec()).expect("Invalid UTF-8 sequence");
+        dbg!(&current_field_string);
+        // println!("offset_and_total_length: {:?}", &offset_and_total_length);
+        // *dynamic_obj_value = offset_and_total_length.into();
+        // *dynamic_obj_value = serde_json::to_value(string_objs[i].to_string()).unwrap();
+        *dynamic_obj_value = serde_json::to_value(current_field_string).unwrap();
+        dbg!(&dynamic_obj_value);
+        // current_offset +=  field_obj_len_list[i] as u64;
+    } else {
+        println!("no value!");
+    }
+}
+});
+
+let obj_with_persisted_dynamic = arc_objs_value.lock().unwrap().clone();
+dbg!(&obj_with_persisted_dynamic);
+obj_with_persisted_dynamic
+    }
+
+
 }
 
 
@@ -391,6 +530,7 @@ mod test {
             // my_boolean: bool,
         }
         
+        
     
     # [test]
     fn test_write_one() {
@@ -406,11 +546,26 @@ mod test {
         my_service.add(my_obj);
     }
     
+    # [test]
+    fn test_add_one() {
+
+        let my_service = ObjectPersistOnDiskService:: < ExampleStruct > ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
+
+        let i = 20000;
+        let my_obj = ExampleStruct {
+            my_number: i,
+            my_string: format!("1hello, world!{i}").to_string(),
+            // my_boolean:  i %4 ==0,
+        };
+        my_service.add(my_obj);
+    }
     
+
                 #[test]
     fn test_read_one() {
         let read_service =ObjectPersistOnDiskService:: <ExampleStruct> ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
-        read_service.read(0, 10);
+        let result = read_service.read(0);
+        println!("read one result:\n {:?}", result);
     }
 
 
@@ -453,7 +608,7 @@ mod test {
         let my_str_size = size_of::<&str>();
         let my_char_size = size_of::<char>();
         let my_bool_size = size_of::<bool>();
-        let objs = my_read_service.read(1, 2);
+        let objs = my_read_service.read(1);
         println!("{:?}", objs);
         dbg!(my_structure_size, my_vec_structure_size, my_str_size, my_string_size, my_char_size, my_bool_size, objs);
         // assert!(false);
@@ -531,7 +686,6 @@ fn test_macro() {
     let result: Vec<String> = example.get_dynamic_fields();
     println!("{:?}", result);
 }
-
 
 }
 

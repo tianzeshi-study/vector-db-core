@@ -82,18 +82,14 @@ impl StringRepository {
     }
 
     /// 根据偏移量和长度加载字符串内容
-    pub fn load_string_content(&self, offset: i64, length: usize) -> Option<String> {
-        match offset {
-            -1 => Some(String::new()), // 空字符串
-            -2 => None,                 // `null`字符串
-            _ => {
-                let string_bytes = self
-                    .file_access
-                    .read_in_file(offset as u64, length);
-                Some(String::from_utf8(string_bytes).expect("Invalid UTF-8 sequence"))
-            }
-        }
+    // pub fn load_string_content(&self, offset: i64, length: usize) -> Option<String> {
+    pub fn load_string_content(&self, offset: u64, length: u64) -> Vec<u8> {
+
+                let string_bytes: Vec<u8> = self.file_access.read_in_file(offset as u64, length as usize);
+                // Some(String::from_utf8(string_bytes).expect("Invalid UTF-8 sequence"))
+                string_bytes
     }
+    
 }
 
 # [cfg(test)]
@@ -102,13 +98,13 @@ mod test {
     const  COUNT: usize = 10;
     
     // #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
-        pub struct ExampleStruct {
-            my_number: usize,
-            my_string: String,
-            // my_boolean: bool,
-        }
-        
-    
+    pub struct ExampleStruct {
+        my_number: usize,
+        my_string: String,
+        // my_boolean: bool,
+    }
+
+
     # [test]
     fn test_dynamic_repository() {
         // 创建服务实例        
@@ -127,7 +123,18 @@ mod test {
         println!("{:?}", result);
     }
     
-    
+    # [test]
+    fn test_load_dynamic_repository() {
+
+        let mut my_service = StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
+        let string_bytes =  my_service.load_string_content(0, 24);
+        let result = String::from_utf8(string_bytes.clone()).expect("Invalid UTF-8 sequence");
+        println!("result: {}", result);
+        // let string_objs: Vec<String> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
+        // println!("{:?}", string_bytes);
+
+    } 
+
 
 }
 
