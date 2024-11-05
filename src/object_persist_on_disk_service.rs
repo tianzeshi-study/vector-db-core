@@ -109,7 +109,6 @@ where
     /// 将对象写入指定索引位置
     fn write_index(&self, index: i64, obj: T) {
 
-
         if !obj.is_dynamic_structure() {
         let size_of_object = get_item_size::<T>();
         let data = Self::serialize_object(&obj);
@@ -146,6 +145,7 @@ where
     }
     
     fn bulk_write_index(&self, index: i64, objs: Vec<T>) {
+        if !objs[0].is_dynamic_structure() {
         let size_of_object = get_item_size::<T>();
         let count  = objs.len();
         let mut buffer: Vec<u8> = vec![0; size_of_object * count];
@@ -194,7 +194,54 @@ let serialized_objs: Vec<Vec<u8>> = objs.par_iter()
         // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
         // file.write_all(&data).expect("Write failed.");
         // file_guard.write_in_file(offset, &data); 
-        file_guard.write_in_file(offset, &buffer); 
+        file_guard.write_in_file(offset, &buffer);
+
+
+        } else {
+            let size_of_object = get_item_size::<T>();
+            let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            let count  = objs.len();
+
+            let objs_with_persisted_dynamic: Vec<Value>  = self.save_object_dynamic(objs);
+            // let dyna_objs:Vec<T> =serde_json::from_value(objs_with_persisted_dynamic.clone()).unwrap();
+let dyna_objs:Vec<T> =objs_with_persisted_dynamic.par_iter()
+.map(|obj| serde_json::from_value(obj.clone()).unwrap())
+.collect();
+            // let data = bincode::serialize(&dyna_objs).expect("Serialization failed");
+            // println!("bytes length of dynamic data to write once: {} ", &data.len());
+
+
+
+
+            let mut buffer: Vec<u8> = vec![0; size_of_object * count];
+            println!("length of buffer: {}", buffer.len());
+        
+
+let serialized_objs: Vec<Vec<u8>> = dyna_objs.par_iter()
+        // .map(|obj| Self::serialize_object(obj))
+        .map(|dyna_obj| bincode::serialize(&dyna_obj).expect("Serialization failed")) 
+        .collect::<Vec<Vec<u8>>>();
+
+    let mut current_position = 0;
+    for serialized_obj in &serialized_objs {
+
+        let serialized_size = serialized_obj.len();
+        let white_space = size_of_object -  serialized_size;
+        println!("white_space: {}", white_space);
+        // 将序列化对象写入缓冲区
+        buffer[current_position..current_position + serialized_size].copy_from_slice(&serialized_obj);
+        current_position += white_space;
+        
+        current_position += serialized_size;
+    }
+    
+        // let offset   = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        println!("bulk write offset: {}",  offset);
+
+            let file_guard = self.structure_file.lock().unwrap();
+                        file_guard.write_in_file(offset, &buffer);
+        }
+
     }
 
 
@@ -420,24 +467,27 @@ let mut json_objs: Vec<_> = objs.par_iter()
             // let mut arc_objs_clone = Arc::clone(&arc_objs);
 
 
-        let field_obj_len_list = Arc::new(RwLock::new(vec![0, objs_len]));
+        let field_obj_len_list = Arc::new(RwLock::new(vec![0; objs_len]));
         let field_obj_len_list_clone = Arc::clone(&field_obj_len_list);
        let arc_objs_value  = Arc::clone(&arc_objs); 
     let byte_vector: Vec<u8> = arc_objs_value.lock().unwrap()
      .par_iter()
-     .map(move |obj| {
+     // .iter()
+     .map(|obj| {
          dbg!(obj);
      obj.get(field.clone()).unwrap()
      })
      // .map(move |obj| obj.to_string().as_bytes().to_vec())
-     .map(move |obj| serde_json::from_value::<Vec<u8>>(obj.clone()).unwrap() )
+     .map( |obj| serde_json::from_value::<Vec<u8>>(obj.clone()).unwrap() )
      // .filter(|x| !x.is_empty())
      // .collect::<Vec<Vec<u8>>>()
      // .par_iter()
      .enumerate()
-     .map(move |(i, obj)|  {
-                 let mut list = field_obj_len_list_clone.write().unwrap();
+     .map(|(i, obj)|  {
                  dbg!(&field, &obj.len());
+                 let field_obj_len_list_write_clone = Arc::clone(&field_obj_len_list);
+                 let mut list = field_obj_len_list_write_clone.write().unwrap(); 
+                 // let mut list = field_obj_len_list_clone.write().unwrap();
         list[i] = obj.len(); 
          obj
      })
@@ -463,7 +513,8 @@ let (offset, end_offset ) = string_repository.write_string_content_and_get_offse
 // objs_iter.par_iter().for_each(|i| {
 for i in 0..objs_len {
     if let Some(dynamic_obj_value) = arc_objs_clone.lock().unwrap()[i].get_mut(field.clone()) {
-        let list_to_read = field_obj_len_list.read().unwrap();
+        let field_obj_len_list_read_clone = Arc::clone(&field_obj_len_list);
+        let list_to_read = field_obj_len_list_read_clone.read().unwrap();
         // let offset_and_total_length = vec![current_offset, current_offset + field_obj_len_list[i] as u64];
         let offset_and_total_length = vec![current_offset, current_offset + list_to_read[i] as u64];
         // dbg!(&field_obj_len_list, &field_obj_len_list[i]);
