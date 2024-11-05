@@ -429,7 +429,8 @@ let mut json_objs: Vec<_> = objs.par_iter()
          dbg!(obj);
      obj.get(field.clone()).unwrap()
      })
-     .map(move |obj| obj.to_string().as_bytes().to_vec())
+     // .map(move |obj| obj.to_string().as_bytes().to_vec())
+     .map(move |obj| serde_json::from_value::<Vec<u8>>(obj.clone()).unwrap() )
      // .filter(|x| !x.is_empty())
      // .collect::<Vec<Vec<u8>>>()
      // .par_iter()
@@ -443,6 +444,7 @@ let mut json_objs: Vec<_> = objs.par_iter()
      .flatten()
      // .copied()
      .collect::<Vec<u8>>();
+     dbg!(&byte_vector);
 
     let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
     let file = std::fs::OpenOptions::new()
@@ -453,7 +455,8 @@ let file_path_str = file_path.to_string_lossy().into_owned();
 let mut  string_repository = StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
 
 
-let (offset, total_length ) = string_repository.write_string_content_and_get_offset(byte_vector);
+// let (offset, total_length ) = string_repository.write_string_content_and_get_offset(byte_vector);
+let (offset, end_offset ) = string_repository.write_string_content_and_get_offset(byte_vector);
  let mut total_length_list: Vec<u64> =  Vec::new();
     let mut current_offset = offset;
     // let objs_iter = (0..objs_len).collect();
@@ -582,9 +585,10 @@ dbg!(&string_objs);
         // let offset_and_total_length = vec![current_offset, current_offset + field_obj_len_list[i] as u64];
         let offset_and_total_length = &field_obj_len_list[i];
         let offset =  offset_and_total_length[0];
-        let total_length =  offset_and_total_length[1];
-        let string_bytes_len = total_length - offset;
-        let current_field_string_bytes  =   &string_bytes[current_offset..current_offset+string_bytes_len];
+        // let total_length =  offset_and_total_length[1];
+        let end_offset  =  offset_and_total_length[1];
+        let string_bytes_len = end_offset - offset ;
+        let current_field_string_bytes  =   &string_bytes[current_offset..current_offset+string_bytes_len -1];
         current_offset += string_bytes_len;
         let current_field_string  = String::from_utf8(current_field_string_bytes.to_vec()).expect("Invalid UTF-8 sequence");
         dbg!(&current_field_string);
@@ -662,22 +666,26 @@ let mut  string_repository = StringRepository::new(file_path_str, self.initial_s
 
 let start_offset: usize = field_obj_len_list[0][0];
 let total_length:usize = field_obj_len_list[field_arguments_list.len() - 1 ][1];
+dbg!(&start_offset, &total_length);
 let string_bytes:Vec<u8> =  string_repository.load_string_content(start_offset as u64, total_length as u64);
-let string_objs: Vec<String> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
+// let string_objs: Vec<u8> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
+let string_objs: Vec<u8> = string_bytes.to_vec();
 dbg!(&string_objs);
    
     let mut current_offset = 0;
     for i in 0..objs_len {
     if let Some(dynamic_obj_value) = arc_objs_value_clone.lock().unwrap()[i].get_mut(field.clone()) {
         let offset_and_total_length = &field_obj_len_list[i];
+        // let total_length =  offset_and_total_length[1];
         let offset =  offset_and_total_length[0];
-        let total_length =  offset_and_total_length[1];
-        let string_bytes_len = total_length - offset;
+        let end_offset =  offset_and_total_length[1];
+        let string_bytes_len = end_offset - offset;
         let current_field_string_bytes  =   &string_bytes[current_offset..current_offset+string_bytes_len];
         current_offset += string_bytes_len;
         // let current_field_string  = String::from_utf8(current_field_string_bytes.to_vec()).expect("Invalid UTF-8 sequence");
         let current_field_string  = current_field_string_bytes.to_vec();
-        dbg!(&current_field_string);
+        dbg!(&current_field_string_bytes, &current_field_string);
+
         *dynamic_obj_value = serde_json::to_value(current_field_string).unwrap();
         dbg!(&dynamic_obj_value);
     } else {
@@ -738,7 +746,7 @@ mod test {
 
         let my_service = ObjectPersistOnDiskService:: < ExampleStruct > ::new("data.bin".to_string(), "StringData.bin".to_string(), 1024).unwrap();
 
-        let i = 20000;
+        let i = 2;
         let my_obj = ExampleStruct {
             my_number: i,
             my_vec: vec![i as u8],

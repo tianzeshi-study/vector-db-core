@@ -66,9 +66,11 @@ impl StringRepository {
 
     /// 写入字符串内容并返回其偏移量和长度
     pub fn write_string_content_and_get_offset(&mut self, bytes_vector: Vec<u8>) -> (u64, u64) {
+        dbg!(&bytes_vector);
                 // let current_offset;
                 let current_offset = self.file_end_offset.lock().unwrap().clone();
-                self.file_access.write_in_file(current_offset, &bytes_vector);
+                dbg!(current_offset);
+                self.file_access.write_in_file(END_OFFSET_SIZE as u64+ current_offset + 1 , &bytes_vector);
                 // {
                     // 使用锁防止文件扩展的并发问题
                     // let _lock = self.expand_size_lock.lock().unwrap();
@@ -84,9 +86,12 @@ impl StringRepository {
     /// 根据偏移量和长度加载字符串内容
     // pub fn load_string_content(&self, offset: i64, length: usize) -> Option<String> {
     pub fn load_string_content(&self, offset: u64, length: u64) -> Vec<u8> {
-
-                let string_bytes: Vec<u8> = self.file_access.read_in_file(offset as u64, length as usize);
+// let offset  = offset +END_OFFSET_SIZE as u64;
+let offset  = offset+1;
+dbg!(&offset, &END_OFFSET_SIZE);
+                let string_bytes: Vec<u8> = self.file_access.read_in_file(END_OFFSET_SIZE as u64+ offset as u64, length as usize);
                 // Some(String::from_utf8(string_bytes).expect("Invalid UTF-8 sequence"))
+                dbg!(&string_bytes);
                 string_bytes
     }
     
