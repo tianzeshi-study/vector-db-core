@@ -66,7 +66,7 @@ impl StringRepository {
 
     /// 写入字符串内容并返回其偏移量和长度
     pub fn write_string_content_and_get_offset(&mut self, bytes_vector: Vec<u8>) -> (u64, u64) {
-        dbg!(&bytes_vector);
+        // dbg!(&bytes_vector);
                 // let current_offset;
                 let current_offset = self.file_end_offset.lock().unwrap().clone();
                 dbg!(current_offset);

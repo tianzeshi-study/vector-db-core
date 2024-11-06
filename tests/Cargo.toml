@@ -1,9 +1,10 @@
 [package]
 name = "vector-db-tests"
 version = "0.1.0"
-# edition = { workspace = true }
+edition = "2021"
 # license = { workspace = true }
 # publish = false
+autotests = false
 
 [[test]]
 harness = true
@@ -13,4 +14,6 @@ path = "tests/lib.rs"
 
 
 [dependencies]
-dynamic-vector-macro = {path ="../tools/dynamic-vector-macro"} 
+vector-db-core = {path =".."} 
+serde = "1.0.214"
+# dynamic-vector-macro = {path ="../tools/dynamic-vector-macro"} 
