@@ -13,6 +13,7 @@ use std::future::Future;
 
 
 pub use dynamic_vector::DynamicVector;
+pub use dynamic_vector::VectorCandidate;
 pub use dynamic_vector::CheckDynamicSize;
 
 

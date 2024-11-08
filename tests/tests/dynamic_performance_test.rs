@@ -3,7 +3,6 @@ mod test {
     use vector_db_core::*;
     use serde::{Serialize, Deserialize};
     use std::time::Instant;
-    use super::*;
     const COUNT:usize = 300000;
     // use std::marker::PhantomData;
     
