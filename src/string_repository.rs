@@ -91,7 +91,7 @@ let offset  = offset+1;
 dbg!(&offset, &END_OFFSET_SIZE);
                 let string_bytes: Vec<u8> = self.file_access.read_in_file(END_OFFSET_SIZE as u64+ offset as u64, length as usize);
                 // Some(String::from_utf8(string_bytes).expect("Invalid UTF-8 sequence"))
-                dbg!(&string_bytes);
+                // dbg!(&string_bytes);
                 string_bytes
     }
     

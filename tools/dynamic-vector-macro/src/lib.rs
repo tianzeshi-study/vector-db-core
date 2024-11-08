@@ -62,7 +62,7 @@ pub fn check_dynamic_size_derive(input: TokenStream) -> TokenStream {
         let names: Vec<_> = fields.named.iter().map(|f| {
             let field_name = &f.ident;
             let field_type = &f.ty; // 获取字段类型
-            let vec_type = Type::Verbatim(quote! { Vec<usize> });
+            // let vec_type = Type::Verbatim(quote! { Vec<usize> });
 
 
             quote! {

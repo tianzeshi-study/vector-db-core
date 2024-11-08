@@ -79,7 +79,7 @@ fn test_dynamic_add_string() {
 }
 
 #[test]
-fn test_dynamic_add_one_by_one() {
+fn test_dynamic_add_only_one_by_one() {
     let mut my_vec = vec![1,2,3,4,5];
     let mut objs = Vec::new();
     let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
