@@ -111,7 +111,7 @@ where
         .collect::<Vec<(u64, u64)>>()
             }
             
-            fn save_dynamic_bulk1(&mut self, objs: Vec<T>) -> Vec<(u64, u64)> {
+            fn _save_dynamic_bulk1(&mut self, objs: Vec<T>) -> Vec<(u64, u64)> {
         
         let bytes_list: Vec<Vec<u8>>  = objs.par_iter()
         .map(|obj| bincode::serialize(&obj).expect("Serialization failed") )
