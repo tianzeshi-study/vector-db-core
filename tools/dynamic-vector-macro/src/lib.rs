@@ -1,6 +1,6 @@
 use proc_macro::TokenStream; // 用于定义过程宏输入和输出的类型
 use quote::quote; // 用于将 Rust 代码片段转换成可编译的代码块
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Type}; // 解析 Rust 语法树和类型
+use syn::{parse_macro_input, Data, DeriveInput, Fields}; // 解析 Rust 语法树和类型
 
 
 
