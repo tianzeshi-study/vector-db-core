@@ -5,21 +5,13 @@ use crate::file_access_service::FileAccessService;
 
 const END_OFFSET_SIZE: usize = std::mem::size_of::<u64>(); // 文件头保留的偏移量空间大小
 
-pub struct SavedDynamic {
-    pub offset: u64,
-    pub total_length: u64,
-}
 
-pub struct ObjectWithPersistedDynamic<T> {
-    pub object: T,
-    pub i_enumerable: Vec<SavedDynamic>,
-}
 
 /// `StringRepository` 用于存储和读取字符串
 pub struct StringRepository {
     file_access: FileAccessService,
     file_end_offset: Arc<Mutex<u64>>,
-    expand_size_lock: Arc<Mutex<()>>,
+    // expand_size_lock: Arc<Mutex<()>>,
 }
 
 impl StringRepository {
@@ -44,12 +36,12 @@ impl StringRepository {
         Self {
             file_access,
             file_end_offset,
-            expand_size_lock: Arc::new(Mutex::new(())),
+            // expand_size_lock: Arc::new(Mutex::new(())),
         }
     }
 
     /// 获取文件的结束偏移量
-    fn get_string_file_end_offset(file_access: &FileAccessService) -> u64 {
+    fn _get_string_file_end_offset(file_access: &FileAccessService) -> u64 {
     // fn get_string_file_end_offset(&self) -> u64 {
         let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
         // let buffer = self.file_access.read_in_file(0, END_OFFSET_SIZE);

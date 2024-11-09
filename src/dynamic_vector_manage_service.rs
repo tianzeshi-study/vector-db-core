@@ -1,18 +1,13 @@
 use rayon::prelude::*;
 pub use serde::{Serialize, Deserialize};
-use serde_json::Value;
 use std::io::{self};
-use std::sync::{Arc, Mutex, RwLock};
-use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use std::mem::{size_of, size_of_val};
+use std::mem::size_of;
 use std::marker::PhantomData;
-use std::future::Future;
 
 
 pub use dynamic_vector::DynamicVector;
-pub use dynamic_vector::VectorCandidate;
-pub use dynamic_vector::CheckDynamicSize;
 
 
 
@@ -31,8 +26,6 @@ where
     // structure_file: Mutex<CachedFileAccessService>, // 结构文件的文件句柄
     structure_file: Mutex<FileAccessService>, 
     string_repository: StringRepository,
-    dynamic_repository_dir:  String,
-    initial_size_if_not_exists: u64,
     _marker: PhantomData<T>, // 用于存储对象类型的占位符
 }
 
@@ -59,8 +52,6 @@ where
             length,
             structure_file: Mutex::new(structure_file_access),
             string_repository: string_repository,
-            dynamic_repository_dir: string_file_path,
-            initial_size_if_not_exists: initial_size_if_not_exists,
             _marker: PhantomData,
         })
     }
@@ -87,98 +78,7 @@ where
         file_guard.write_in_file(0, &buffer);
     }
 
-
-
-    fn load_object_dynamic(&self, objs: Vec<T>) -> Vec<Value>{
-
-        let  dynamic_fields: Vec<String> =  objs[0].get_dynamic_fields();
-        let  dynamic_fields_count = dynamic_fields.len();
-        println!("dynamic_fields: {:?}, dynamic_fields_count: {}", dynamic_fields, dynamic_fields_count);
-
-        let total_dynamic_fields_count = dynamic_fields_count * objs.len();
-        let objs_len = objs.len();
-        let mut dynamic_bytes:Vec<u8> = vec![0;total_dynamic_fields_count];
-        println!("origin objs, {:?}", &objs);
-             
-let mut json_objs: Vec<Value> = objs.par_iter()
-     .map( |obj| serde_json::to_value(obj).unwrap())
-     .collect();
-
-     // println!("json_objs, {:?}", json_objs);
-
-     let objs_value: Vec<_> =Vec::new();
-     
-     let arc_objs = Arc::new(Mutex::new(json_objs));
-     let arc_objs_clone = Arc::clone(&arc_objs);
-     
-     let arc_objs_value = Arc::new(Mutex::new(objs_value));
-     let arc_objs_value_clone = Arc::clone(&arc_objs_value);
-     
-        dynamic_fields.par_iter()
-        .for_each(move  |field| {
-
-        let mut field_obj_len_list: Vec<Vec<usize>> = Vec::new();
-    let  field_arguments_list: Vec<Vec<usize>> = arc_objs_clone.lock().unwrap()
-     .par_iter()
-     .map(|obj| obj.get(field.clone()).unwrap())
-     .map( |obj| {
-         dbg!(obj);
-         serde_json::from_value(obj.clone()).unwrap()
-     })
-     .collect::<Vec<Vec<usize>>>();
-
-     *arc_objs_value_clone.lock().unwrap() = arc_objs_clone.lock().unwrap()
-     .par_iter()
-     .cloned()
-     .collect::<Vec<Value>>();
-
-     
-     field_arguments_list.iter()
-     .for_each(|obj| {
-         field_obj_len_list.push(obj.to_vec());
-     });
-     dbg!(&field_arguments_list);
-     
-let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
-
-let file_path_str = file_path.to_string_lossy().into_owned();
-let mut  string_repository = StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
-
-let start_offset: usize = field_obj_len_list[0][0];
-let total_length:usize = field_obj_len_list[field_arguments_list.len() - 1 ][1];
-dbg!(&start_offset, &total_length);
-let string_bytes:Vec<u8> =  string_repository.load_string_content(start_offset as u64, total_length as u64);
-// let string_objs: Vec<u8> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
-let string_objs: Vec<u8> = string_bytes.to_vec();
-dbg!(&string_objs);
    
-    let mut current_offset = 0;
-    for i in 0..objs_len {
-    if let Some(dynamic_obj_value) = arc_objs_value_clone.lock().unwrap()[i].get_mut(field.clone()) {
-        let offset_and_total_length = &field_obj_len_list[i];
-        // let total_length =  offset_and_total_length[1];
-        let offset =  offset_and_total_length[0];
-        let end_offset =  offset_and_total_length[1];
-        let string_bytes_len = end_offset - offset;
-        let current_field_string_bytes  =   &string_bytes[current_offset..current_offset+string_bytes_len];
-        current_offset += string_bytes_len;
-        // let current_field_string  = String::from_utf8(current_field_string_bytes.to_vec()).expect("Invalid UTF-8 sequence");
-        let current_field_string  = current_field_string_bytes.to_vec();
-        dbg!(&current_field_string_bytes, &current_field_string);
-
-        *dynamic_obj_value = serde_json::to_value(current_field_string).unwrap();
-        dbg!(&dynamic_obj_value);
-    } else {
-        println!("no value!");
-    }
-}
-});
-
-let obj_with_persisted_dynamic = arc_objs_value.lock().unwrap().clone();
-dbg!(&obj_with_persisted_dynamic);
-obj_with_persisted_dynamic
-    }
-    
     fn save_dynamic(&mut self, objs: Vec<T>) -> (u64, u64) {
         let bytes = bincode::serialize(&objs).expect("Serialization failed");
         let (start_offset, end_offset) = self.string_repository.write_string_content_and_get_offset(bytes);
@@ -186,7 +86,7 @@ obj_with_persisted_dynamic
         (start_offset, end_offset)
     }
     
-    fn save_dynamic_bulk1(&mut self, objs: Vec<T>) -> Vec<(u64, u64)> {
+    fn save_dynamic_bulk(&mut self, objs: Vec<T>) -> Vec<(u64, u64)> {
         
         let bytes: Vec<u8> = objs.par_iter()
         .map(|obj| bincode::serialize(&obj).expect("Serialization failed") )
@@ -211,7 +111,7 @@ obj_with_persisted_dynamic
         .collect::<Vec<(u64, u64)>>()
             }
             
-            fn save_dynamic_bulk(&mut self, objs: Vec<T>) -> Vec<(u64, u64)> {
+            fn save_dynamic_bulk1(&mut self, objs: Vec<T>) -> Vec<(u64, u64)> {
         
         let bytes_list: Vec<Vec<u8>>  = objs.par_iter()
         .map(|obj| bincode::serialize(&obj).expect("Serialization failed") )

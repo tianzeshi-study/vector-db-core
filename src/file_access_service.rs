@@ -63,7 +63,7 @@ impl FileAccessService {
         // 检查读取的范围是否超出当前文件大小
         // if  length as u64 >  * current_size {
         if offset + length as u64 >  * current_size {
-            dbg!(offset, length, current_size);
+            // dbg!(offset, length, current_size);
             panic!("Exceeded the file size while reading");
         }
 
@@ -71,8 +71,8 @@ impl FileAccessService {
         let mut fs = OpenOptions::new().read(true).open( & self.path).expect("Unable to open file");
         fs.seek(SeekFrom::Start(offset)).expect("Unable to seek to offset");
         let mut buffer = vec![0;length];
-        dbg!(&buffer.len());
-        dbg!(offset, length, current_size);
+        // dbg!(&buffer.len());
+        // dbg!(offset, length, current_size);
         println!("cache buffer to read: {}", &buffer.len());
         fs.read_exact( & mut buffer).expect("Failed to read the expected length of data");
         buffer

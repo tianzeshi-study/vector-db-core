@@ -52,7 +52,7 @@ impl CachedFileAccessService {
 
     /// 从文件的指定偏移量读取数据，并使用缓存提高读取效率
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
-        let mut result = vec![0; length];
+        let result = vec![0; length];
         // let mut current_offset = offset;
         // let mut current_offset = length ;
         // dbg!(current_offset);
