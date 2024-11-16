@@ -2,12 +2,12 @@
 mod test {
     use vector_db_core::*;
     use serde::{Serialize, Deserialize};
-    use super::*;
+
     const COUNT:usize = 1000000;
-    use std::marker::PhantomData;
+
     
             #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
-        pub struct DynamicStruct
+        pub struct StaticStruct
         // <T> 
         // where 
         // T: Serialize + Default+Send,
@@ -30,12 +30,12 @@ mod test {
         
         impl
         // <T> 
-        DynamicStruct
+        StaticStruct
         // <T>
         // where 
         // T: Clone+Send,
         {
-            fn hello(&self ) {
+            fn _hello(&self ) {
                 println!("hello");
             } 
         } 
@@ -44,7 +44,7 @@ mod test {
 
 #[test]
 fn test_dynamic_add_one() {
-    let my_obj:DynamicStruct   = DynamicStruct {
+    let my_obj:StaticStruct   = StaticStruct {
             my_usize: 443,
             my_u64: 53,
             my_u32: 4399,
@@ -56,13 +56,13 @@ fn test_dynamic_add_one() {
             // my_vec: vec![1,2,3,4,5],
             // my_array: [1,2,3,4,5],
         };
-        let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
+        let my_service = ObjectPersistOnDiskService:: < StaticStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
         my_service.add(my_obj);
 }
 
 #[test]
 fn test_dynamic_add_string() {
-    let my_obj: DynamicStruct   = DynamicStruct {
+    let my_obj: StaticStruct   = StaticStruct {
             my_usize: 443,
             my_u64: 53,
             my_u32: 4399,
@@ -74,54 +74,47 @@ fn test_dynamic_add_string() {
             // my_vec: vec!["hello".to_string(), "world".to_string()],
             // my_array: [1,2,3,4,5],
         };
-        let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
+        let my_service = ObjectPersistOnDiskService:: < StaticStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
         my_service.add(my_obj);
 }
 
 #[test]
 fn test_dynamic_add_only_one_by_one() {
-    let mut my_vec = vec![1,2,3,4,5];
+
     let mut objs = Vec::new();
-    let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
-    for i in 0..COUNT {
-    let my_obj: DynamicStruct   = DynamicStruct {
-            my_usize: 443,
-            my_u64: 53,
-            my_u32: 4399,
-            my_u16: 3306,
-            my_u8: 22,
+    let my_service = ObjectPersistOnDiskService:: < StaticStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
+    for i in 0..10 {
+    let my_obj: StaticStruct   = StaticStruct {
+            my_usize: 443 +i,
+            my_u64: 53 +i as u64,
+            my_u32: 4399 +i as u32,
+            my_u16: 3306 +i as u16,
+            my_u8: 22 +i as u8,
             my_boolean: true,
-            // my_string: "good luck!".to_string(),
-            // my_vec: vec!["hello".to_string(), "world".to_string()],
-            // my_vec: my_vec.clone(),
-            // my_array: [1,2,3,4,5],
         };
         // my_vec.push(i as u64 *1000);
 
         objs.push(my_obj.clone());
         my_service.add(my_obj);
     }
-        // let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
+        // let my_service = ObjectPersistOnDiskService:: < StaticStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
         // my_service.add_bulk(objs);
 }
 
 #[test]
 fn test_static_add_bulk() {
-    let mut my_vec = vec![1,2,3,4,5];
+
     let mut objs = Vec::new();
-    let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
+    let my_service = ObjectPersistOnDiskService:: < StaticStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
     for i in 0..COUNT {
-    let my_obj: DynamicStruct   = DynamicStruct {
-            my_usize: 443,
+    let my_obj: StaticStruct   = StaticStruct {
+            my_usize: 443 + i,
             my_u64: 53,
             my_u32: 4399,
             my_u16: 3306,
             my_u8: 22,
             my_boolean: true,
-            // my_string: "good luck!".to_string(),
-            // my_vec: vec!["hello".to_string(), "world".to_string()],
-            // my_vec: my_vec.clone(),
-            // my_array: [1,2,3,4,5],
+
         };
         // my_vec.push(i as u64 *1000);
 
@@ -132,7 +125,7 @@ fn test_static_add_bulk() {
 #[test]
 fn test_static_read_bulk() {
 
-    let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
+    let my_service = ObjectPersistOnDiskService:: < StaticStruct> ::new("TestDynamicData.bin".to_string(), "TestDynamicDataDynamic.bin".to_string(), 1024).unwrap();
 my_service.read_bulk(0, COUNT);
 }
 

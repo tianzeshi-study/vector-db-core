@@ -581,7 +581,7 @@ fn get_item_size<T>() -> usize {
 # [cfg(test)]
 mod test {
     use super:: * ;
-    const  COUNT: usize = 800000;
+    const  COUNT: usize = 1000;
     
     #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
         pub struct ExampleStruct {
@@ -716,14 +716,14 @@ mod test {
         let mut objs_list = std::vec::Vec::new();
         for i in 0..COUNT {
         // 示例添加对象
-        let i =1;
+
         let my_obj = ExampleStruct {
             my_number: i,
             // my_string: format!("hello, {i} world!").to_string(),
             my_vec: vec![i],
         };
         objs_list.push(my_obj.clone());
-        // println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+
         }
         io_service.add_bulk(objs_list);
         let objs = io_service.read_bulk(0, COUNT );

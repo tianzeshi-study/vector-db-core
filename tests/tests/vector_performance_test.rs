@@ -4,8 +4,8 @@ mod test {
     use serde::{Serialize, Deserialize};
     use std::time::Instant;
     
-    const COUNT:usize = 1000;
-    // use std::marker::PhantomData;
+    const COUNT:usize = 10000;
+
     
             #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
         pub struct DynamicStruct {
@@ -18,11 +18,12 @@ mod test {
             my_usize_vec: Vec<usize>,
             my_64_vec: Vec<u64>,
             my_32_vec: Vec<u32>,
+            my_string: String,
         }
         
 
 #[test]
-fn test_dynamic_add_one() {
+fn test_save_one() {
     let i = COUNT;
     let my_obj:DynamicStruct   = DynamicStruct {
             my_usize:  443 + i,
@@ -34,17 +35,25 @@ fn test_dynamic_add_one() {
             my_usize_vec: vec![i],
             my_32_vec: vec![i as u32],            
             my_64_vec: vec![i as u64],
+            my_string: format!("hello, {} world", i),
         };
-        let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("data.bin".to_string(), "StringDynamicData.bin".to_string(), 1024).unwrap();
-        my_service.add(my_obj);
+        let mut my_service = DynamicVectorManageService:: < DynamicStruct> ::new("vector.bin".to_string(), "StringDynamicvector.bin".to_string(), 1024).unwrap();
+        my_service.save(my_obj);
 }
 
 #[test]
-fn test_dynamic_add_bulk() {
+fn test_load_one() {
+
+    let my_service = DynamicVectorManageService:: < DynamicStruct> ::new("vector.bin".to_string(), "StringDynamicvector.bin".to_string(), 1024).unwrap();
+    my_service.load(0);
+}
+
+#[test]
+fn test_save_bulk() {
     
     let mut my_vec = Vec::new();
     let mut objs = Vec::new();
-    let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("data.bin".to_string(), "StringDynamicData.bin".to_string(), 1024).unwrap();
+    let mut my_service = DynamicVectorManageService:: < DynamicStruct> ::new("vector.bin".to_string(), "StringDynamicvector.bin".to_string(), 1024).unwrap();
     for i in 0..COUNT {
     let my_obj:DynamicStruct   = DynamicStruct {
             my_usize: 443,
@@ -56,6 +65,7 @@ fn test_dynamic_add_bulk() {
             my_usize_vec: my_vec.clone(),
             my_32_vec: vec![i as u32],            
             my_64_vec: vec![i as u64],
+            my_string: format!("hello, {} world", i),
         };
 
 
@@ -64,17 +74,17 @@ fn test_dynamic_add_bulk() {
         my_vec.push(i +1);
     }
     let start = Instant::now(); // 记录开始时间
-        my_service.add_bulk(objs);
+        my_service.save_bulk(objs);
     let duration = start.elapsed(); // 计算时间差
     println!("add  {} items   took: {:?}",COUNT  ,  duration);
 }
 
 #[test]
-fn test_dynamic_read_bulk() {
+fn test_load_bulk() {
 
-    let my_service = ObjectPersistOnDiskService:: < DynamicStruct> ::new("data.bin".to_string(), "StringDynamicData.bin".to_string(), 1024).unwrap();
+    let my_service = DynamicVectorManageService:: < DynamicStruct> ::new("vector.bin".to_string(), "StringDynamicvector.bin".to_string(), 1024).unwrap();
     let start = Instant::now(); // 记录开始时间
-    my_service.read_bulk(0, COUNT);
+    my_service.load_bulk(0, COUNT as u64);
     let duration = start.elapsed(); // 计算时间差
     println!("read {} items   took: {:?}",COUNT  ,  duration);
 }

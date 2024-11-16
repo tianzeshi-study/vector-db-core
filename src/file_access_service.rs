@@ -73,7 +73,7 @@ impl FileAccessService {
         let mut buffer = vec![0;length];
         // dbg!(&buffer.len());
         // dbg!(offset, length, current_size);
-        println!("cache buffer to read: {}", &buffer.len());
+        // println!("cache buffer to read: {}", &buffer.len());
         fs.read_exact( & mut buffer).expect("Failed to read the expected length of data");
         buffer
     }

@@ -18,7 +18,7 @@ impl StringRepository {
     /// 初始化 `StringRepository`，并设置文件结束偏移量
     pub fn new(string_file_path: String, initial_size_if_not_exists: u64) -> Self {
         let file_access = FileAccessService::new(string_file_path.clone(), initial_size_if_not_exists);
-        println!("string repository initial_size_if_not_exists: {}, path: {:?}", initial_size_if_not_exists, string_file_path);
+        // println!("string repository initial_size_if_not_exists: {}, path: {:?}", initial_size_if_not_exists, string_file_path);
         // let file_end_offset = Self::get_string_file_end_offset(&file_access);
         // let file_end_offset = Self::get_string_file_end_offset();
         
@@ -45,7 +45,7 @@ impl StringRepository {
     // fn get_string_file_end_offset(&self) -> u64 {
         let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
         // let buffer = self.file_access.read_in_file(0, END_OFFSET_SIZE);
-        println!("buffer in string repository : {} ", &buffer.len());
+        // println!("buffer in string repository : {} ", &buffer.len());
         // let offset = 8;
         let offset = u64::from_le_bytes(buffer.try_into().unwrap());
         // let offset = u64::from_le_bytes(buffer.try_into().unwrap());
@@ -92,29 +92,13 @@ dbg!(&offset, &END_OFFSET_SIZE);
 # [cfg(test)]
 mod test {
     use super:: * ;
-    const  COUNT: usize = 10;
-    
-    // #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
-    pub struct ExampleStruct {
-        my_number: usize,
-        my_string: String,
-        // my_boolean: bool,
-    }
 
+    
 
     # [test]
-    fn test_dynamic_repository() {
+    fn test_write_dynamic_repository() {
         // 创建服务实例        
         let mut my_service = StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
-        // 示例添加对象
-        let i = 1;
-        let my_obj = ExampleStruct {
-            my_number: i,
-            my_string: format!("hello, world!{i}").to_string(),
-            // my_boolean:  i %4 ==0,
-        };
-        // my_service.add(my_obj);
-        // let bytes_vector    : Vec<u8> =vec![0,64];
         let bytes_vector    : Vec<u8> = "hello, world".to_string().as_bytes().to_vec();
         let result = my_service.write_string_content_and_get_offset(bytes_vector);
         println!("{:?}", result);
@@ -123,13 +107,10 @@ mod test {
     # [test]
     fn test_load_dynamic_repository() {
 
-        let mut my_service = StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
+        let my_service = StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
         let string_bytes =  my_service.load_string_content(0, 24);
         let result = String::from_utf8(string_bytes.clone()).expect("Invalid UTF-8 sequence");
         println!("result: {}", result);
-        // let string_objs: Vec<String> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
-        // println!("{:?}", string_bytes);
-
     } 
 
 
