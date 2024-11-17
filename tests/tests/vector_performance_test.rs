@@ -1,5 +1,3 @@
-#[cfg(test)]
-mod test {
     use serde::{Deserialize, Serialize};
     use std::time::Instant;
     use vector_db_core::*;
@@ -46,6 +44,7 @@ mod test {
 
     #[test]
     fn test_load_one() {
+        test_save_one();
         let my_service = DynamicVectorManageService::<DynamicStruct>::new(
             "vector.bin".to_string(),
             "StringDynamicvector.bin".to_string(),
@@ -90,6 +89,7 @@ mod test {
 
     #[test]
     fn test_load_bulk() {
+        test_save_bulk();
         let my_service = DynamicVectorManageService::<DynamicStruct>::new(
             "vector.bin".to_string(),
             "StringDynamicvector.bin".to_string(),
@@ -101,4 +101,3 @@ mod test {
         let duration = start.elapsed(); // 计算时间差
         println!("read {} items   took: {:?}", COUNT, duration);
     }
-}

@@ -426,7 +426,7 @@ where
                 .open(file_path.clone());
 
             let file_path_str = file_path.to_string_lossy().into_owned();
-            let mut string_repository =
+            let string_repository =
                 StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
 
             let (offset, _end_offset) =

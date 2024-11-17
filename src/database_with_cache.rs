@@ -17,7 +17,7 @@ pub struct CachedFileAccessService {
 
 impl CachedFileAccessService {
     /// 创建一个 `CachedFileAccessService` 实例
-    pub fn new(path: String,initial_size_if_not_exists: u64) -> Self {
+    pub fn new(path: String, initial_size_if_not_exists: u64) -> Self {
         Self {
             file_access_service: FileAccessService::new(path, initial_size_if_not_exists),
             cache: Arc::new(Mutex::new(HashMap::new())),
@@ -33,16 +33,16 @@ impl CachedFileAccessService {
     pub fn write_in_file(&self, offset: u64, data: &[u8]) {
         let start_page = offset / self.page_size as u64;
         let end_page = (offset + data.len() as u64) / self.page_size as u64;
-        
+
         {
             let mut cache = self.cache.lock().unwrap();
             let mut lru_list = self.lru_list.lock().unwrap();
-            
+
             for page in start_page..=end_page {
                 if cache.contains_key(&page) {
                     cache.remove(&page);
                     // lru_list.retain(|&x| x != page);
-                    remove_item(&mut lru_list,page);
+                    remove_item(&mut lru_list, page);
                 }
             }
         }
@@ -60,49 +60,52 @@ impl CachedFileAccessService {
         // let mut remaining_length = length;
 
         // while remaining_length > 0 {
-            // let page_offset = current_offset / self.page_size;
-            // let page_start = current_offset % self.page_size;
-            // dbg!(current_offset, self.page_size);
+        // let page_offset = current_offset / self.page_size;
+        // let page_start = current_offset % self.page_size;
+        // dbg!(current_offset, self.page_size);
 
-            // let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
+        // let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
 
-            // let page_data = self.get_page_from_cache(offset, page_offset as u64);
-            // dbg!(&page_data.len());
-            // dbg!(result.len(), result_offset, bytes_to_read, page_start);
-            // result[result_offset..result_offset + bytes_to_read]
-                // .copy_from_slice(&page_data[page_start..page_start + bytes_to_read]);
+        // let page_data = self.get_page_from_cache(offset, page_offset as u64);
+        // dbg!(&page_data.len());
+        // dbg!(result.len(), result_offset, bytes_to_read, page_start);
+        // result[result_offset..result_offset + bytes_to_read]
+        // .copy_from_slice(&page_data[page_start..page_start + bytes_to_read]);
 
-            // current_offset += bytes_to_read;
-            // result_offset += bytes_to_read;
-            // remaining_length -= bytes_to_read;
+        // current_offset += bytes_to_read;
+        // result_offset += bytes_to_read;
+        // remaining_length -= bytes_to_read;
         // }
 
         // result
-         self.file_access_service.read_in_file(offset, length as usize)
+        self.file_access_service
+            .read_in_file(offset, length as usize)
     }
 
     /// 从缓存中获取页面数据，如果缓存缺失则从文件中读取并添加到缓存
     fn get_page_from_cache(&self, file_offset: u64, page_offset: u64) -> Vec<u8> {
         {
-        let cache = self.cache.lock().unwrap();
-        // let mut lru_list = self.lru_list.lock().unwrap();
+            let cache = self.cache.lock().unwrap();
+            // let mut lru_list = self.lru_list.lock().unwrap();
 
-        if let Some(page_data) = cache.get(&page_offset) {
-            if self.should_update_lru(&page_offset) {
-                // lru_list.retain(|&x| x != page_offset);
-                let mut lru_list = self.lru_list.lock().unwrap();
-                remove_item(&mut lru_list, page_offset);
-                lru_list.push_back(page_offset);
+            if let Some(page_data) = cache.get(&page_offset) {
+                if self.should_update_lru(&page_offset) {
+                    // lru_list.retain(|&x| x != page_offset);
+                    let mut lru_list = self.lru_list.lock().unwrap();
+                    remove_item(&mut lru_list, page_offset);
+                    lru_list.push_back(page_offset);
+                }
+
+                return page_data.clone();
             }
-            
-            return page_data.clone();
         }
-        }
-        dbg!(page_offset , self.page_size);
+        dbg!(page_offset, self.page_size);
         // let page_data = self.file_access_service.read_in_file(file_offset, page_offset * self.page_size as u64);
         let read_length = page_offset * self.page_size as u64;
         dbg!(file_offset, read_length);
-        let page_data = self.file_access_service.read_in_file(file_offset, read_length as usize);
+        let page_data = self
+            .file_access_service
+            .read_in_file(file_offset, read_length as usize);
         self.add_to_cache(page_offset, page_data.clone());
         page_data
     }
@@ -136,11 +139,12 @@ impl CachedFileAccessService {
 fn remove_item(lru_list: &mut LinkedList<u64>, page: u64) {
     let mut current = lru_list.front(); // 从列表的前端开始
 
-    while let Some(&value) = current { // 获取当前节点的值
+    while let Some(&value) = current {
+        // 获取当前节点的值
         if value == page {
             // 如果值与要删除的元素匹配，使用 pop_front() 删除元素
             lru_list.pop_front(); // 删除头部元素
-            // 更新 current 为下一个元素
+                                  // 更新 current 为下一个元素
             current = lru_list.front(); // 更新为新头部
         } else {
             // 继续检查下一个元素
@@ -149,38 +153,36 @@ fn remove_item(lru_list: &mut LinkedList<u64>, page: u64) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
-
 
     const TEST_FILE_PATH: &str = "test_file.bin";
     const INITIAL_SIZE_IF_NOT_EXISTS: u64 = 1024;
     // const PAGE_SIZE: usize = 1024; // 1KB 页面大小
     // const MAX_CACHE_ITEMS: usize = 4; // 最多缓存4个页面
 
-
     fn test_write_and_read_in_file() {
         // 初始化文件缓存服务
         // let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string() ,INITIAL_SIZE_IF_NOT_EXISTS,  PAGE_SIZE, MAX_CACHE_ITEMS);
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string() ,INITIAL_SIZE_IF_NOT_EXISTS);
-        
+        let service =
+            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
+
         // 写入数据
         let offset = 0;
         let data = vec![1, 2, 3, 4, 5];
         service.write_in_file(offset, &data);
-        
+
         // 读取并验证数据
         let result = service.read_in_file(0, data.len());
         assert_eq!(result, data);
     }
 
-
     fn test_cache_eviction() {
         // 测试缓存淘汰策略
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
+        let service =
+            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
 
         // 写入多个页面数据
         for i in 0..(MAX_CACHE_ITEMS + 1) as u64 {
@@ -190,15 +192,15 @@ mod tests {
 
         // 检查是否有一个页面被移出缓存
         {
-        let cache = service.cache.lock().unwrap();
-        assert!(cache.len() <= MAX_CACHE_ITEMS);
+            let cache = service.cache.lock().unwrap();
+            assert!(cache.len() <= MAX_CACHE_ITEMS);
         }
     }
 
-
     fn test_cache_hit() {
         // 测试缓存命中率
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
+        let service =
+            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
 
         // 写入并读取相同的页面，验证缓存命中
         let offset = 0;
@@ -218,10 +220,10 @@ mod tests {
         // assert!(cache.contains_key(&(offset / PAGE_SIZE as u64)));
     }
 
-
     fn test_lru_cache_behavior() {
         // 测试 LRU 缓存行为
-        let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
+        let service =
+            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
 
         // 写入多个页面数据
         for i in 0..MAX_CACHE_ITEMS as u64 {
@@ -242,16 +244,15 @@ mod tests {
         {
             let cache = service.cache.lock().unwrap();
             assert!(!cache.contains_key(&(offset / PAGE_SIZE as u64))); // 第1页应该不再在缓存中
-            // assert!(cache.contains_key(&(new_page_offset / PAGE_SIZE as u64))); // 新页面应在缓存中
+                                                                        // assert!(cache.contains_key(&(new_page_offset / PAGE_SIZE as u64))); // 新页面应在缓存中
         }
     }
-
 
     // 清理测试文件
     fn cleanup() {
         let _ = fs::remove_file(TEST_FILE_PATH);
     }
-    
+
     #[test]
     fn test_cache() {
         test_write_and_read_in_file();

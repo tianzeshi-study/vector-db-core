@@ -1,5 +1,3 @@
-#[cfg(test)]
-mod test {
     use serde::{Deserialize, Serialize};
     use std::time::Instant;
     use vector_db_core::*;
@@ -77,6 +75,7 @@ mod test {
 
     #[test]
     fn test_dynamic_read_bulk() {
+        test_dynamic_add_bulk();
         let my_service = ObjectPersistOnDiskService::<DynamicStruct>::new(
             "data.bin".to_string(),
             "StringDynamicData.bin".to_string(),
@@ -88,4 +87,3 @@ mod test {
         let duration = start.elapsed(); // 计算时间差
         println!("read {} items   took: {:?}", COUNT, duration);
     }
-}

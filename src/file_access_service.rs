@@ -1,4 +1,5 @@
 use std::fs::{File, OpenOptions};
+use std::io::{self};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Mutex};
 
@@ -33,7 +34,7 @@ impl FileAccessService {
         let mut current_size = self.current_size.lock().unwrap(); // 获取当前大小的锁
 
         // 检查写入数据是否超过当前文件大小
-        if offset + data.len() as u64 > *current_size {
+        while offset + data.len() as u64 > *current_size {
             // 文件扩展逻辑
             let fs = OpenOptions::new()
                 .write(true)
@@ -54,15 +55,41 @@ impl FileAccessService {
         fs.write_all(data).expect("Unable to write data");
     }
 
+    pub fn write_in_file_control(&self, offset: u64, data: &[u8]) -> io::Result<()> {
+        let mut current_size = self.current_size.lock().unwrap(); // 获取当前大小的锁
+
+        // 检查写入数据是否超过当前文件大小
+        while offset + data.len() as u64 > *current_size {
+            // 文件扩展逻辑
+            let fs = OpenOptions::new()
+                .write(true)
+                .open(&self.path)
+                .expect("Unable to open file");
+            fs.set_len(*current_size * 2)
+                .expect("Unable to extend file size");
+            *current_size *= 2; // 更新当前大小
+        }
+
+        // 写入数据
+        let mut fs = OpenOptions::new()
+            .write(true)
+            .open(&self.path)
+            .expect("Unable to open file");
+        fs.seek(SeekFrom::Start(offset))
+            .expect("Unable to seek to offset");
+        fs.write_all(data).expect("Unable to write data");
+        Ok(())
+    }
+
     // 从文件指定偏移量读取数据
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
         let current_size = self.current_size.lock().unwrap(); // 获取当前大小的锁
 
         // length +=4;
         // 检查读取的范围是否超出当前文件大小
-        // if  length as u64 >  * current_size {
-        if offset + length as u64 > *current_size {
-            // dbg!(offset, length, current_size);
+        if length as u64 > *current_size {
+            // if offset + length as u64 > *current_size {
+            dbg!(offset, length, current_size);
             panic!("Exceeded the file size while reading");
         }
 

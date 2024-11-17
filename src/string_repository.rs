@@ -58,37 +58,41 @@ impl StringRepository {
     /// 写入字符串内容并返回其偏移量和长度
     pub fn _write_string_content_and_get_offset(&mut self, bytes_vector: Vec<u8>) -> (u64, u64) {
         // dbg!(&bytes_vector);
-                // let current_offset;
-                let current_offset = self.file_end_offset.lock().unwrap().clone();
-                dbg!(current_offset);
-                self.file_access.write_in_file(END_OFFSET_SIZE as u64+ current_offset + 1 , &bytes_vector);
-                *self.file_end_offset.lock().unwrap() += bytes_vector.len() as u64;
+        // let current_offset;
+        let current_offset = self.file_end_offset.lock().unwrap().clone();
+        dbg!(current_offset);
+        self.file_access
+            .write_in_file(END_OFFSET_SIZE as u64 + current_offset + 1, &bytes_vector);
+        *self.file_end_offset.lock().unwrap() += bytes_vector.len() as u64;
 
-                self.file_access.write_in_file(0, &self.file_end_offset.lock().unwrap().to_le_bytes());
-                (current_offset as u64, current_offset + bytes_vector.len() as u64)
+        self.file_access
+            .write_in_file(0, &self.file_end_offset.lock().unwrap().to_le_bytes());
+        (
+            current_offset as u64,
+            current_offset + bytes_vector.len() as u64,
+        )
     }
-    
+
     pub fn write_string_content_and_get_offset(&self, bytes_vector: Vec<u8>) -> (u64, u64) {
         // dbg!(&bytes_vector);
         let current_offset = {
-        let mut current_offset = self.file_end_offset.lock().unwrap();
-        dbg!(&current_offset);
-        self.file_access
-            .write_in_file(END_OFFSET_SIZE as u64 + current_offset.clone()  + 1, &bytes_vector);
-        // *self.file_end_offset.lock().unwrap() += bytes_vector.len() as u64;
-        *current_offset += bytes_vector.len() as u64;
+            let mut current_offset = self.file_end_offset.lock().unwrap();
+            dbg!(&current_offset);
+            self.file_access.write_in_file(
+                END_OFFSET_SIZE as u64 + current_offset.clone() + 1,
+                &bytes_vector,
+            );
+            // *self.file_end_offset.lock().unwrap() += bytes_vector.len() as u64;
+            *current_offset += bytes_vector.len() as u64;
 
-        self.file_access
-            .write_in_file(0, &current_offset.clone().to_le_bytes());
-            
+            self.file_access
+                .write_in_file(0, &current_offset.clone().to_le_bytes());
+
             current_offset.clone()
-    };
-    dbg!(&current_offset);
-    
-        (
-            current_offset -  bytes_vector.len() as u64,
-            current_offset ,
-        )
+        };
+        dbg!(&current_offset);
+
+        (current_offset - bytes_vector.len() as u64, current_offset)
     }
 
     /// 根据偏移量和长度加载字符串内容

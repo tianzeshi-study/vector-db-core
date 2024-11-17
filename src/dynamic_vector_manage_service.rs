@@ -13,7 +13,7 @@ const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 8 by
 
 pub struct DynamicVectorManageService<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + Default + Send,
+    T: Serialize + for<'de> Deserialize<'de> + Send,
 {
     length: Arc<Mutex<u64>>,
     // structure_file: Mutex<CachedFileAccessService>, // 结构文件的文件句柄
@@ -24,7 +24,7 @@ where
 
 impl<T> DynamicVectorManageService<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + Default + 'static + std::fmt::Debug + Clone + Send + Sync,
+    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
 {
     pub fn new(
         structure_file_path: String,

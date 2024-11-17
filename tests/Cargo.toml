@@ -15,5 +15,10 @@ path = "tests/lib.rs"
 
 [dependencies]
 vector-db-core = {path =".."} 
-serde = "1.0.214"
+serde = {version = "1.0.214", features = ["derive", "alloc", "unstable"] }
+# serde = { version = "1.0.127", features = ["derive", "array"] }
+chrono = {version = "0.4.38", features = ["serde"] }
+uuid = {version = "1.11.0", features = ["serde"] }
+sha2 = "0.10.8"
+blake2 = "0.10.6"
 # dynamic-vector-macro = {path ="../tools/dynamic-vector-macro"} 
