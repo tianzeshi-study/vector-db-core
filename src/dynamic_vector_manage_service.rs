@@ -346,7 +346,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use dynamic_vector::CheckDynamicSize;
+    // use dynamic_vector::CheckDynamicSize;
     use dynamic_vector::VectorCandidate;
 
     const COUNT: usize = 1000000;

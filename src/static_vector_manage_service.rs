@@ -27,7 +27,7 @@ where
     length: Arc<Mutex<u64>>,
     structure_file: Mutex<FileAccessService>, // 结构文件的文件句柄
     // string_repository: StringRepository,
-    dynamic_repository_dir: String,
+    // dynamic_repository_dir: String,
     initial_size_if_not_exists: u64,
     _marker: PhantomData<T>, // 用于存储对象类型的占位符
 }
@@ -38,12 +38,12 @@ where
 {
     pub fn new(
         structure_file_path: String,
-        string_file_path: String,
+        _string_file_path: String,
         initial_size_if_not_exists: u64,
     ) -> io::Result<Self> {
         let structure_file_access =
             FileAccessService::new(structure_file_path, initial_size_if_not_exists);
-        let _ = std::fs::create_dir_all(&string_file_path);
+        // let _ = std::fs::create_dir_all(&string_file_path);
         // let string_repository = StringRepository::new(string_file_path.clone(), initial_size_if_not_exists);
         // let length = get_length();
         let length = {
@@ -60,7 +60,7 @@ where
             length,
             structure_file: Mutex::new(structure_file_access),
             // string_repository: string_repository,
-            dynamic_repository_dir: string_file_path,
+            // dynamic_repository_dir: _string_file_path,
             initial_size_if_not_exists: initial_size_if_not_exists,
             _marker: PhantomData,
         })
@@ -370,7 +370,7 @@ mod test {
             1024,
         )
         .unwrap();
-        my_service.read(COUNT);
+        my_service.read(COUNT as u64);
     }
 
     #[test]

@@ -1,10 +1,98 @@
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, LinkedList};
 use std::sync::{Arc, Mutex};
 
 use crate::file_access_service::FileAccessService;
+use crate::vector_engine::VectorDatabase;
 
 const PAGE_SIZE: usize = 2;
-const MAX_CACHE_ITEMS: usize = 512;
+const MAX_CACHE_ITEMS: usize = 900000;
+
+/*
+pub struct DatabaseWithCache<D<T>: VectorDatabase<T>>
+where
+T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+{
+    database: D<T>,
+}
+*/
+
+pub struct WritableCache<D, T>
+where
+    D: VectorDatabase<T>,
+    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+{
+    database: D,                     // 底层数据库
+    cached_data: Arc<Mutex<Vec<T>>>, // 缓存数据
+    max_cache_items: usize,
+}
+
+pub struct ReadableCache<D, T>
+where
+    D: VectorDatabase<T>,
+    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+{
+    writable_cache: WritableCache<D, T>,
+    cache: Arc<Mutex<HashMap<u64, T>>>,
+    lru_list: Arc<Mutex<LinkedList<u64>>>,
+    page_size: usize,
+    max_cache_items: usize,
+}
+
+impl<D, T> WritableCache<D, T>
+where
+    D: VectorDatabase<T>,
+    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+{
+    pub fn new(
+        static_repository: String,
+        dynamic_repository: String,
+        initial_size_if_not_exists: u64,
+    ) -> Self {
+        Self {
+            database: VectorDatabase::new(
+                static_repository,
+                dynamic_repository,
+                initial_size_if_not_exists,
+            ),
+            // cached_data: Arc::new(Mutex::new(Vec::new())),
+            cached_data: Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS))),
+            max_cache_items: MAX_CACHE_ITEMS,
+        }
+    }
+
+    pub fn push(&self, obj: T) {
+        let mut cache = self.cached_data.lock().unwrap();
+        cache.push(obj);
+        if cache.len() >= self.max_cache_items {
+            self.database.extend(cache.to_vec());
+            *cache = Vec::new();
+        }
+    }
+
+    pub fn extend(&self, objs: Vec<T>) {
+        let mut cache = self.cached_data.lock().unwrap();
+        let mut objs = objs;
+        cache.append(&mut objs);
+        if cache.len() >= self.max_cache_items {
+            self.database.extend(cache.to_vec());
+            *cache = Vec::new();
+        }
+    }
+}
+
+impl<D, T> Drop for WritableCache<D, T>
+where
+    D: VectorDatabase<T>,
+    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+{
+    fn drop(&mut self) {
+        let cache = self.cached_data.lock().unwrap();
+        if cache.len() != 0 {
+            self.database.extend(cache.to_vec());
+        }
+    }
+}
 
 /// 缓存文件访问服务，实现带缓存的文件读写，使用LRU缓存淘汰策略
 pub struct CachedFileAccessService {
@@ -53,31 +141,33 @@ impl CachedFileAccessService {
     /// 从文件的指定偏移量读取数据，并使用缓存提高读取效率
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
         let result = vec![0; length];
-        // let mut current_offset = offset;
-        // let mut current_offset = length ;
-        // dbg!(current_offset);
-        // let mut result_offset = 0;
-        // let mut remaining_length = length;
+        /*
+        let mut current_offset = offset;
+        let mut current_offset = length ;
+        dbg!(current_offset);
+        let mut result_offset = 0;
+        let mut remaining_length = length;
 
-        // while remaining_length > 0 {
-        // let page_offset = current_offset / self.page_size;
-        // let page_start = current_offset % self.page_size;
-        // dbg!(current_offset, self.page_size);
+        while remaining_length > 0 {
+        let page_offset = current_offset / self.page_size;
+        let page_start = current_offset % self.page_size;
+        dbg!(current_offset, self.page_size);
 
-        // let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
+        let bytes_to_read = std::cmp::min(remaining_length, self.page_size - page_start);
 
-        // let page_data = self.get_page_from_cache(offset, page_offset as u64);
-        // dbg!(&page_data.len());
-        // dbg!(result.len(), result_offset, bytes_to_read, page_start);
-        // result[result_offset..result_offset + bytes_to_read]
-        // .copy_from_slice(&page_data[page_start..page_start + bytes_to_read]);
+        let page_data = self.get_page_from_cache(offset, page_offset as u64);
+        dbg!(&page_data.len());
+        dbg!(result.len(), result_offset, bytes_to_read, page_start);
+        result[result_offset..result_offset + bytes_to_read]
+        .copy_from_slice(&page_data[page_start..page_start + bytes_to_read]);
 
-        // current_offset += bytes_to_read;
-        // result_offset += bytes_to_read;
-        // remaining_length -= bytes_to_read;
-        // }
+        current_offset += bytes_to_read;
+        result_offset += bytes_to_read;
+        remaining_length -= bytes_to_read;
+        }
 
-        // result
+        result
+        */
         self.file_access_service
             .read_in_file(offset, length as usize)
     }
@@ -154,111 +244,168 @@ fn remove_item(lru_list: &mut LinkedList<u64>, page: u64) {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-    use std::fs;
+    use crate::dynamic_vector_manage_service::DynamicVectorManageService;
+    use crate::static_vector_manage_service::StaticVectorManageService;
+    const COUNT: usize = 1000000;
 
-    const TEST_FILE_PATH: &str = "test_file.bin";
-    const INITIAL_SIZE_IF_NOT_EXISTS: u64 = 1024;
-    // const PAGE_SIZE: usize = 1024; // 1KB 页面大小
-    // const MAX_CACHE_ITEMS: usize = 4; // 最多缓存4个页面
-
-    fn test_write_and_read_in_file() {
-        // 初始化文件缓存服务
-        // let service = CachedFileAccessService::new(TEST_FILE_PATH.to_string() ,INITIAL_SIZE_IF_NOT_EXISTS,  PAGE_SIZE, MAX_CACHE_ITEMS);
-        let service =
-            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
-
-        // 写入数据
-        let offset = 0;
-        let data = vec![1, 2, 3, 4, 5];
-        service.write_in_file(offset, &data);
-
-        // 读取并验证数据
-        let result = service.read_in_file(0, data.len());
-        assert_eq!(result, data);
-    }
-
-    fn test_cache_eviction() {
-        // 测试缓存淘汰策略
-        let service =
-            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
-
-        // 写入多个页面数据
-        for i in 0..(MAX_CACHE_ITEMS + 1) as u64 {
-            let data = vec![i as u8; PAGE_SIZE];
-            service.write_in_file(i * PAGE_SIZE as u64, &data);
-        }
-
-        // 检查是否有一个页面被移出缓存
-        {
-            let cache = service.cache.lock().unwrap();
-            assert!(cache.len() <= MAX_CACHE_ITEMS);
-        }
-    }
-
-    fn test_cache_hit() {
-        // 测试缓存命中率
-        let service =
-            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
-
-        // 写入并读取相同的页面，验证缓存命中
-        let offset = 0;
-        let data = vec![42; PAGE_SIZE];
-        service.write_in_file(offset, &data);
-
-        // 第一次读取：缓存未命中，从文件读取
-        // let first_read = service.read_in_file(offset, PAGE_SIZE);
-        // assert_eq!(first_read, data);
-
-        // 第二次读取：应命中缓存
-        // let second_read = service.read_in_file(offset, PAGE_SIZE);
-        // assert_eq!(second_read, data);
-
-        // 检查缓存是否命中
-        // let cache = service.cache.lock().unwrap();
-        // assert!(cache.contains_key(&(offset / PAGE_SIZE as u64)));
-    }
-
-    fn test_lru_cache_behavior() {
-        // 测试 LRU 缓存行为
-        let service =
-            CachedFileAccessService::new(TEST_FILE_PATH.to_string(), INITIAL_SIZE_IF_NOT_EXISTS);
-
-        // 写入多个页面数据
-        for i in 0..MAX_CACHE_ITEMS as u64 {
-            let data = vec![i as u8; PAGE_SIZE];
-            service.write_in_file(i * PAGE_SIZE as u64, &data);
-        }
-
-        // 读取第一个页面，使其成为最近使用的页面
-        let offset = 0;
-        // let _ = service.read_in_file(offset, PAGE_SIZE);
-
-        // 写入新的页面数据，触发缓存淘汰
-        let new_page_offset = MAX_CACHE_ITEMS as u64 * PAGE_SIZE as u64;
-        let new_data = vec![99; PAGE_SIZE];
-        service.write_in_file(new_page_offset, &new_data);
-
-        // 验证最旧的页面（第1页）是否被移出缓存
-        {
-            let cache = service.cache.lock().unwrap();
-            assert!(!cache.contains_key(&(offset / PAGE_SIZE as u64))); // 第1页应该不再在缓存中
-                                                                        // assert!(cache.contains_key(&(new_page_offset / PAGE_SIZE as u64))); // 新页面应在缓存中
-        }
-    }
-
-    // 清理测试文件
-    fn cleanup() {
-        let _ = fs::remove_file(TEST_FILE_PATH);
+    #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+    pub struct StaticStruct {
+        my_usize: usize,
+        my_u64: u64,
+        my_u32: u32,
+        my_u16: u16,
+        my_u8: u8,
+        my_boolean: bool,
     }
 
     #[test]
-    fn test_cache() {
-        test_write_and_read_in_file();
-        test_cache_eviction();
-        test_cache_hit();
-        test_lru_cache_behavior();
-        cleanup();
+    fn test_push_static_one() {
+        let my_obj: StaticStruct = StaticStruct {
+            my_usize: 443,
+            my_u64: 53,
+            my_u32: 4399,
+            my_u16: 3306,
+            my_u8: 22,
+            my_boolean: true,
+            // my_string: "good luck!".to_string(),
+            // my_vec: vec!["hello".to_string(), "world".to_string()],
+            // my_vec: vec![1,2,3,4,5],
+            // my_array: [1,2,3,4,5],
+        };
+        let my_service =
+            WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
+                "cacheS.bin".to_string(),
+                "cacheSD.bin".to_string(),
+                1024,
+            );
+
+        my_service.push(my_obj);
+    }
+
+    #[test]
+    fn test_one_by_one_push_static() {
+        // let mut objs = Vec::new();
+        let my_service =
+            WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
+                "cacheS.bin".to_string(),
+                "cacheSD.bin".to_string(),
+                1024,
+            );
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+            // my_vec.push(i as u64 *1000);
+
+            my_service.push(my_obj);
+        }
+        // my_service.add_bulk(objs);
+    }
+
+    #[test]
+    fn test_one_by_one_push_dynamic() {
+        // let mut objs = Vec::new();
+        let my_service =
+            WritableCache::<DynamicVectorManageService<StaticStruct>, StaticStruct>::new(
+                "cacheD.bin".to_string(),
+                "cacheDD.bin".to_string(),
+                1024,
+            );
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+            // my_vec.push(i as u64 *1000);
+
+            my_service.push(my_obj);
+        }
+        // my_service.add_bulk(objs);
+    }
+
+    #[test]
+    fn test_extend_static() {
+        let mut objs = Vec::new();
+        let my_service =
+            WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
+                "cacheS.bin".to_string(),
+                "cacheSD.bin".to_string(),
+                1024,
+            );
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+
+            objs.push(my_obj);
+        }
+        my_service.extend(objs);
+    }
+    /*
+
+        #[test]
+        fn test_read_static_one() {
+            let my_service = StaticVectorManageService::<StaticStruct>::new(
+                "TestDynamicData.bin".to_string(),
+                "TestDynamicDataDynamic.bin".to_string(),
+                1024,
+            )
+            .unwrap();
+            my_service.read(COUNT);
+        }
+    */
+    #[test]
+    fn test_read_static_bulk_in_pushed() {
+        let my_service = StaticVectorManageService::<StaticStruct>::new(
+            "cacheS.bin".to_string(),
+            "cacheSD.bin".to_string(),
+            1024,
+        )
+        .unwrap();
+        my_service.read_bulk(0, COUNT as u64);
+        dbg!(my_service.get_length());
+    }
+
+    #[test]
+    fn test_add_bulk_compare() {
+        let mut objs = Vec::new();
+        let my_service = StaticVectorManageService::<StaticStruct>::new(
+            "cacheS.bin".to_string(),
+            "cacheSD.bin".to_string(),
+            1024,
+        )
+        .unwrap();
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+            // my_vec.push(i as u64 *1000);
+            objs.push(my_obj);
+
+            // my_service.push(&my_obj);
+            // my_service.add(my_obj);
+        }
+        my_service.add_bulk(objs);
     }
 }
