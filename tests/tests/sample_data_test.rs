@@ -71,7 +71,7 @@
         let start = Instant::now(); // 记录开始时间
         my_service.save_bulk(objs);
         let duration = start.elapsed(); // 计算时间差
-        println!("add  {} items   took: {:?}", COUNT, duration);
+        println!("save  {} items   took: {:?}", COUNT, duration);
     }
 
     #[test]
@@ -91,7 +91,7 @@
             objs[objs.len() - 1]
         );
         let duration = start.elapsed(); // 计算时间差
-        println!("read {} items   took: {:?}", COUNT, duration);
+        println!("load {} items   took: {:?}", COUNT, duration);
     }
 
 #[test]
@@ -117,7 +117,7 @@
         let start = Instant::now(); // 记录开始时间
         my_service.save_bulk(objs);
         let duration = start.elapsed(); // 计算时间差
-        println!("add  {} items   took: {:?}", COUNT, duration);
+        println!("save  {} items   took: {:?}", COUNT, duration);
         my_service.load_bulk(0, COUNT as u64);
         let load_duration = start.elapsed(); // 计算时间差
         println!("load  {} items   took: {:?}", COUNT, load_duration - duration);
