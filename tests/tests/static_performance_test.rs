@@ -1,13 +1,15 @@
 #[cfg(test)]
 mod test {
-    use serde::{Deserialize, Serialize};
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
     use vector_db_core::*;
 
     const COUNT: usize = 1000000;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
-    pub struct StaticStruct
-    {
+    pub struct StaticStruct {
         my_usize: usize,
         my_u64: u64,
         my_u32: u32,

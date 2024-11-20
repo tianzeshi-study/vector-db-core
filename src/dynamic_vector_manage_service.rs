@@ -1,7 +1,6 @@
 use rayon::prelude::*;
 pub use serde::{Deserialize, Serialize};
 use std::io::{self};
-use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex};
@@ -27,6 +26,7 @@ impl<T> DynamicVectorManageService<T>
 where
     T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
 {
+    
     pub fn new(
         structure_file_path: String,
         string_file_path: String,
@@ -84,75 +84,11 @@ where
         (start_offset, end_offset)
     }
     
+
+    
+
+    
     pub fn save_dynamic_bulk(&self, objs: Vec<T>) -> Vec<(u64, u64)> {
-        let start = Instant::now();
-
-let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
-    .par_iter()
-    .map(|obj| {
-        let serialized = bincode::serialize(&obj).expect("Serialization failed");
-        let len = serialized.len() as u64;
-        (serialized, len)
-    })
-    .fold(
-        || (Vec::new(), Vec::new()), // 初始值
-        |mut acc, (serialized, len)| {
-            acc.0.extend(serialized); // 将序列化的字节展开并加入 `bytes`
-            acc.1.push(len);          // 将字节长度加入 `length_list`
-            acc
-        },
-    )
-    .reduce(
-        || (Vec::new(), Vec::new()), // 初始值
-        |(mut bytes1, mut lengths1), (bytes2, lengths2)| {
-            bytes1.extend(bytes2);        // 合并两个字节向量
-            lengths1.extend(lengths2);   // 合并两个长度向量
-            (bytes1, lengths1)
-        },
-    );
-
-
-
-        let collect_length_list_duration = start.elapsed();
-        println!(
-            "collect length list took: {:?}",
-            collect_length_list_duration
-        );
-
-        let (start_offset, _) = self
-            .string_repository
-            .write_string_content_and_get_offset(bytes);
-        let write_vector_content_duration = start.elapsed();
-        println!(
-            "save vector content  took: {:?}",
-            write_vector_content_duration - collect_length_list_duration
-        );
-
-    let mut start_and_len: Vec<u64> = Vec::with_capacity(length_list.len() +1);
-    start_and_len.push(start_offset);
-    start_and_len.extend(length_list);
-        let mut start_list = parallel_prefix_sum_optimized(&start_and_len);
-        let mut end_list = start_list.clone();
-        end_list.pop_front();        
-        start_list.pop_back();
-        let offsets_list  =  start_list.par_iter()
-        .enumerate()
-        .map(|(i, start)|  (*start, end_list[i]) )
-        .collect::<Vec<(u64, u64)>>();
-
-
-        let collect_offsets_duration = start.elapsed();
-        println!(
-            "collect offsets took: {:?}",
-            collect_offsets_duration - write_vector_content_duration
-        );
-
-        offsets_list
-    }
-    
-
-    
-    pub fn save_dynamic_bulk_x(&self, objs: Vec<T>) -> Vec<(u64, u64)> {
         let start = Instant::now();
 
 let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
@@ -376,98 +312,6 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
         objs
     }
 }
-
-fn parallel_prefix_sum_optimized(arr: &[u64]) -> VecDeque<u64> {
-    let n = arr.len();
-    
-    // Step 1: 并行计算分块内的前缀和
-    let chunk_size = 1000; // 每个线程处理的元素个数
-    let mut partial_sums: Vec<Vec<u64>> = arr.par_chunks(chunk_size) // 使用par_chunks进行并行
-        .map(|chunk| {
-            let mut chunk_sum = vec![0; chunk.len()];
-            let mut local_sum = 0;
-            for (i, &value) in chunk.iter().enumerate() {
-                local_sum += value;
-                chunk_sum[i] = local_sum;
-            }
-            chunk_sum
-        })
-        .collect();
-
-    // Step 2: 合并分块间的偏移值
-    let mut offset = 0;
-    let mut result = VecDeque::with_capacity(n);
-    for chunk in partial_sums {
-        for &sum in chunk.iter() {
-            result.push_back(sum + offset); // 加上偏移量
-        }
-        // 更新偏移量
-        offset = *chunk.last().unwrap(); // 每个块的最后一个元素的值
-    }
-
-    result
-}
-
-
-fn parallel_prefix_sum_optimized0(arr: &[u64]) -> VecDeque<u64> {
-    let mut result = VecDeque::from(vec![0; arr.len()]);
-    
-    // Step 1: 并行计算分块内的前缀和，并将结果保存在一个临时的向量中
-    let partial_sums: Vec<Vec<u64>> = arr.par_chunks(1000) // 每个线程处理1000个元素（根据实际硬件调整）
-        .enumerate()
-        .map(|(chunk_idx, chunk)| {
-            let mut local_sum = 0;
-            let mut chunk_sums = vec![0; chunk.len()];
-            for (i, &value) in chunk.iter().enumerate() {
-                local_sum += value;
-                chunk_sums[i] = local_sum;
-            }
-            chunk_sums
-        })
-        .collect();
-
-    // Step 2: 合并分块间的偏移值
-    let mut offset = 0;
-    let mut result_idx = 0;
-    for chunk_sums in partial_sums {
-        for (i, &sum) in chunk_sums.iter().enumerate() {
-            result[result_idx] = sum + offset;
-            result_idx += 1;
-        }
-        offset = chunk_sums[chunk_sums.len() - 1];
-    }
-
-    result
-}
-
-/*
-fn parallel_prefix_sum_optimized1(arr: &[u64]) -> Vec<u64> {
-    let mut result = vec![0; arr.len()];
-    
-    // Step 1: 并行计算分块内的前缀和
-    arr.par_chunks(1000) // 每个线程处理1000个元素（根据实际硬件调整）
-        .enumerate()
-        .for_each(|(chunk_idx, chunk)| {
-            let mut local_sum = 0;
-            for (i, &value) in chunk.iter().enumerate() {
-                local_sum += value;
-                result[chunk_idx * 1000 + i] = local_sum;
-            }
-        });
-
-    // Step 2: 合并分块间的偏移值
-    let mut offset = 0;
-    for i in (0..arr.len()).step_by(1000) {
-        for j in 0..1000.min(arr.len() - i) {
-            result[i + j] += offset;
-        }
-        offset = result[i + 1000.min(arr.len() - i) - 1];
-    }
-
-    result
-}
-*/
-
 
 #[cfg(test)]
 mod test {

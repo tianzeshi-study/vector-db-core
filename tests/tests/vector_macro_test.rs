@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod test {
-    use serde::{Deserialize, Serialize};
+    use serde::{
+        Deserialize,
+        Serialize,
+    };
     use vector_db_core::*;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
