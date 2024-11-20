@@ -1,18 +1,33 @@
 use rayon::prelude::*;
-pub use serde::{Deserialize, Serialize};
+pub use serde::{
+    Deserialize,
+    Serialize,
+};
 use serde_json::Value;
-use std::io::{self};
-use std::marker::PhantomData;
-use std::mem::size_of;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
+use std::{
+    io::{
+        self,
+    },
+    marker::PhantomData,
+    mem::size_of,
+    sync::{
+        Arc,
+        Mutex,
+        RwLock,
+    },
+    time::Instant,
+};
 
-pub use dynamic_vector::CheckDynamicSize;
-pub use dynamic_vector::DynamicVector;
-pub use dynamic_vector::VectorCandidate;
+pub use dynamic_vector::{
+    CheckDynamicSize,
+    DynamicVector,
+    VectorCandidate,
+};
 
-use crate::file_access_service::FileAccessService;
-use crate::string_repository::StringRepository;
+use crate::{
+    file_access_service::FileAccessService,
+    string_repository::StringRepository,
+};
 
 // const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 4 bytes for Length
 const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 8 bytes for Length
@@ -35,7 +50,12 @@ where
 impl<T: Send + Sync> ObjectPersistOnDiskService<T>
 where
     // T: Serialize + for<'de> Deserialize<'de> + Default,
-    T: Serialize + for<'de> Deserialize<'de> + Default + 'static + DynamicVector + std::fmt::Debug,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + Default
+        + 'static
+        + DynamicVector
+        + std::fmt::Debug,
 {
     pub fn new(
         structure_file_path: String,
@@ -62,7 +82,7 @@ where
             structure_file: Mutex::new(structure_file_access),
             // string_repository: string_repository,
             dynamic_repository_dir: string_file_path,
-            initial_size_if_not_exists: initial_size_if_not_exists,
+            initial_size_if_not_exists,
             _marker: PhantomData,
         })
     }
@@ -116,7 +136,8 @@ where
 
             println!("bytes length of data to write once: {} ", &data.len());
 
-            let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            let offset =
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
 
             // file.seek(SeekFrom::Start(offset)).expect("Seek failed.");
             // file.write_all(&data).expect("Write failed.");
@@ -141,7 +162,8 @@ where
                 &data.len()
             );
 
-            let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            let offset =
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
 
             let file_guard = self.structure_file.lock().unwrap();
             file_guard.write_in_file(offset, &data);
@@ -191,7 +213,8 @@ where
 
             // .flat_map(|vec| vec)
             // let offset = (4 + (index as usize * data.len())) as u64;
-            let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            let offset =
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
             println!("bulk write offset: {}", offset);
             // println!("bulk write data length:{}", data.len());
 
@@ -202,7 +225,8 @@ where
             file_guard.write_in_file(offset, &buffer);
         } else {
             let size_of_object = get_item_size::<T>();
-            let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            let offset =
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
             let count = objs.len();
 
             let start = Instant::now(); // 记录开始时间
@@ -420,14 +444,17 @@ where
                 to_string_duration - to_json_value_duration
             );
 
-            let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
+            let file_path =
+                std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
             let _ = std::fs::OpenOptions::new()
                 .create_new(true)
                 .open(file_path.clone());
 
             let file_path_str = file_path.to_string_lossy().into_owned();
-            let string_repository =
-                StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
+            let string_repository = StringRepository::new(
+                file_path_str,
+                self.initial_size_if_not_exists.clone(),
+            );
 
             let (offset, _end_offset) =
                 string_repository.write_string_content_and_get_offset(byte_vector);
@@ -452,7 +479,8 @@ where
                     // dbg!(&field_obj_len_list, &field_obj_len_list[i]);
                     let mut bytes_offset: Vec<u8> = current_offset.to_le_bytes().to_vec();
                     // let bytes_total_length: Vec<u8> = (current_offset + field_obj_len_list[i] as u64).to_le_bytes().to_vec();
-                    let bytes_total_length: Vec<u8> = (current_offset + list_to_read[i] as u64)
+                    let bytes_total_length: Vec<u8> = (current_offset
+                        + list_to_read[i] as u64)
                         .to_le_bytes()
                         .to_vec();
                     bytes_offset.extend(bytes_total_length.iter());
@@ -534,17 +562,21 @@ where
             });
             // dbg!(&field_arguments_list);
 
-            let file_path = std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
+            let file_path =
+                std::path::Path::new(&self.dynamic_repository_dir).join(field.clone());
 
             let file_path_str = file_path.to_string_lossy().into_owned();
-            let string_repository =
-                StringRepository::new(file_path_str, self.initial_size_if_not_exists.clone());
+            let string_repository = StringRepository::new(
+                file_path_str,
+                self.initial_size_if_not_exists.clone(),
+            );
 
             let start_offset: usize = field_obj_len_list[0][0];
-            let total_length: usize = field_obj_len_list[field_arguments_list.len() - 1][1];
+            let total_length: usize =
+                field_obj_len_list[field_arguments_list.len() - 1][1];
             // dbg!(&start_offset, &total_length);
-            let string_bytes: Vec<u8> =
-                string_repository.load_string_content(start_offset as u64, total_length as u64);
+            let string_bytes: Vec<u8> = string_repository
+                .load_string_content(start_offset as u64, total_length as u64);
             // let string_objs: Vec<u8> = bincode::deserialize(&string_bytes).expect("Deserialization failed");
             // let string_objs: Vec<u8> = string_bytes.to_vec();
             // dbg!(&string_objs);
@@ -566,7 +598,8 @@ where
                     let current_field_string = current_field_string_bytes.to_vec();
                     // dbg!(&current_field_string_bytes, &current_field_string);
 
-                    *dynamic_obj_value = serde_json::to_value(current_field_string).unwrap();
+                    *dynamic_obj_value =
+                        serde_json::to_value(current_field_string).unwrap();
                     // dbg!(&dynamic_obj_value);
                 } else {
                     println!("no value!");

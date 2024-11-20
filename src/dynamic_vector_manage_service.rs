@@ -1,13 +1,25 @@
 use rayon::prelude::*;
-pub use serde::{Deserialize, Serialize};
-use std::io::{self};
-use std::marker::PhantomData;
-use std::mem::size_of;
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+pub use serde::{
+    Deserialize,
+    Serialize,
+};
+use std::{
+    io::{
+        self,
+    },
+    marker::PhantomData,
+    mem::size_of,
+    sync::{
+        Arc,
+        Mutex,
+    },
+    time::Instant,
+};
 
-use crate::file_access_service::FileAccessService;
-use crate::string_repository::StringRepository;
+use crate::{
+    file_access_service::FileAccessService,
+    string_repository::StringRepository,
+};
 
 const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 8 bytes for Length
 
@@ -24,9 +36,14 @@ where
 
 impl<T> DynamicVectorManageService<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
 {
-    
     pub fn new(
         structure_file_path: String,
         string_file_path: String,
@@ -50,7 +67,7 @@ where
         Ok(Self {
             length,
             structure_file: Mutex::new(structure_file_access),
-            string_repository: string_repository,
+            string_repository,
             _marker: PhantomData,
         })
     }
@@ -83,39 +100,33 @@ where
 
         (start_offset, end_offset)
     }
-    
 
-    
-
-    
     pub fn save_dynamic_bulk(&self, objs: Vec<T>) -> Vec<(u64, u64)> {
         let start = Instant::now();
 
-let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
-    .par_iter()
-    .map(|obj| {
-        let serialized = bincode::serialize(&obj).expect("Serialization failed");
-        let len = serialized.len() as u64;
-        (serialized, len)
-    })
-    .fold(
-        || (Vec::new(), Vec::new()), // 初始值
-        |mut acc, (serialized, len)| {
-            acc.0.extend(serialized); // 将序列化的字节展开并加入 `bytes`
-            acc.1.push(len);          // 将字节长度加入 `length_list`
-            acc
-        },
-    )
-    .reduce(
-        || (Vec::new(), Vec::new()), // 初始值
-        |(mut bytes1, mut lengths1), (bytes2, lengths2)| {
-            bytes1.extend(bytes2);        // 合并两个字节向量
-            lengths1.extend(lengths2);   // 合并两个长度向量
-            (bytes1, lengths1)
-        },
-    );
-
-
+        let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
+            .par_iter()
+            .map(|obj| {
+                let serialized = bincode::serialize(&obj).expect("Serialization failed");
+                let len = serialized.len() as u64;
+                (serialized, len)
+            })
+            .fold(
+                || (Vec::new(), Vec::new()), // 初始值
+                |mut acc, (serialized, len)| {
+                    acc.0.extend(serialized); // 将序列化的字节展开并加入 `bytes`
+                    acc.1.push(len); // 将字节长度加入 `length_list`
+                    acc
+                },
+            )
+            .reduce(
+                || (Vec::new(), Vec::new()), // 初始值
+                |(mut bytes1, mut lengths1), (bytes2, lengths2)| {
+                    bytes1.extend(bytes2); // 合并两个字节向量
+                    lengths1.extend(lengths2); // 合并两个长度向量
+                    (bytes1, lengths1)
+                },
+            );
 
         let collect_length_list_duration = start.elapsed();
         println!(
@@ -151,8 +162,6 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
         offsets_list
     }
 
-
-
     fn load_dynamic(&self, start_offset: u64, end_offset: u64) -> T {
         let bytes: Vec<u8> = self
             .string_repository
@@ -161,10 +170,14 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
         obj
     }
 
-    pub fn load_dynamic_bulk(&self, start_offset_and_end_offset_list: Vec<(u64, u64)>) -> Vec<T> {
+    pub fn load_dynamic_bulk(
+        &self,
+        start_offset_and_end_offset_list: Vec<(u64, u64)>,
+    ) -> Vec<T> {
         let start_offset = start_offset_and_end_offset_list[0].0;
-        let end_offset =
-            start_offset_and_end_offset_list[start_offset_and_end_offset_list.len() - 1].1;
+        let end_offset = start_offset_and_end_offset_list
+            [start_offset_and_end_offset_list.len() - 1]
+            .1;
         let bytes: Vec<u8> = self
             .string_repository
             .load_string_content(start_offset, end_offset);
@@ -210,8 +223,8 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
             self.save_length(*length);
             index
         };
-        let file_offset =
-            index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2 + LENGTH_MARKER_SIZE as u64;
+        let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
+            + LENGTH_MARKER_SIZE as u64;
         let (start_offset, end_offset) = self.save_dynamic(obj);
         let mut bytes_offset: Vec<u8> = start_offset.to_le_bytes().to_vec();
         let bytes_total_length: Vec<u8> = end_offset.to_le_bytes().to_vec();
@@ -221,10 +234,12 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
     }
 
     pub fn load(&self, index: u64) -> T {
-        let file_offset = 2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
+        let file_offset =
+            2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
         // dbg!(&file_offset);
         let file_guard = self.structure_file.lock().unwrap();
-        let marker_data: Vec<u8> = file_guard.read_in_file(file_offset, 2 * LENGTH_MARKER_SIZE);
+        let marker_data: Vec<u8> =
+            file_guard.read_in_file(file_offset, 2 * LENGTH_MARKER_SIZE);
         assert_eq!(marker_data.len(), 16);
         let start_offset_bytes = &marker_data[0..8];
         let end_offset_bytes = &marker_data[8..16];
@@ -247,8 +262,8 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
             self.save_length(*length);
             index
         };
-        let file_offset =
-            index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2 + LENGTH_MARKER_SIZE as u64;
+        let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
+            + LENGTH_MARKER_SIZE as u64;
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
         let save_dynamic_duration = start.elapsed();
@@ -280,7 +295,8 @@ let (bytes, length_list): (Vec<u8>, Vec<u64>) = objs
     }
 
     pub fn load_bulk(&self, index: u64, count: u64) -> Vec<T> {
-        let file_offset = 2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
+        let file_offset =
+            2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
         let file_guard = self.structure_file.lock().unwrap();
         let marker_data: Vec<u8> =
             file_guard.read_in_file(file_offset, 2 * LENGTH_MARKER_SIZE * count as usize);
@@ -328,7 +344,6 @@ mod test {
         my_vec2: Vec<usize>,
     }
 
-
     fn test_save_one() {
         let mut my_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic0.bin".to_string(),
@@ -364,9 +379,8 @@ mod test {
         assert_eq!(0, obj.id);
         println!("read one result:\n {:?}", obj);
         let length = read_service.get_length();
-        assert_eq!(length,  1);
+        assert_eq!(length, 1);
     }
-
 
     fn test_save_bulk() {
         // 创建服务实例
@@ -391,7 +405,7 @@ mod test {
         }
         let start = Instant::now();
         write_service.save_bulk(objs_list);
-let save_bulk_duration = start.elapsed();
+        let save_bulk_duration = start.elapsed();
         println!("save bulk    took: {:?}", save_bulk_duration);
     }
 
@@ -413,14 +427,12 @@ let save_bulk_duration = start.elapsed();
             objs[objs.len() - 1],
             objs.len()
         );
-        assert_eq!(objs[objs.len() - 1].id, COUNT -1);
+        assert_eq!(objs[objs.len() - 1].id, COUNT - 1);
         let length = read_service.get_length();
         assert_eq!(length, COUNT as u64);
         std::fs::remove_file("Dynamic.bin").unwrap();
         std::fs::remove_file("StringDynamic.bin").unwrap();
     }
-
-
 
     #[test]
     fn test_get_dynamic_length() {

@@ -1,18 +1,31 @@
 use rayon::prelude::*;
-pub use serde::{Deserialize, Serialize};
+pub use serde::{
+    Deserialize,
+    Serialize,
+};
 use serde_json::Value;
-use std::io::{self};
-use std::marker::PhantomData;
-use std::mem::size_of;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
+use std::{
+    io::{
+        self,
+    },
+    marker::PhantomData,
+    mem::size_of,
+    sync::{
+        Arc,
+        Mutex,
+        RwLock,
+    },
+    time::Instant,
+};
 
 // pub use dynamic_vector::CheckDynamicSize;
 // pub use dynamic_vector::DynamicVector;
 pub use dynamic_vector::VectorCandidate;
 
-use crate::file_access_service::FileAccessService;
-use crate::string_repository::StringRepository;
+use crate::{
+    file_access_service::FileAccessService,
+    string_repository::StringRepository,
+};
 
 // const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 4 bytes for Length
 const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 8 bytes for Length
@@ -61,7 +74,7 @@ where
             structure_file: Mutex::new(structure_file_access),
             // string_repository: string_repository,
             // dynamic_repository_dir: _string_file_path,
-            initial_size_if_not_exists: initial_size_if_not_exists,
+            initial_size_if_not_exists,
             _marker: PhantomData,
         })
     }
@@ -106,7 +119,8 @@ where
 
         println!("bytes length of data to write once: {} ", &data.len());
 
-        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        let offset =
+            (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
 
         let file = self.structure_file.lock().unwrap();
         file.write_in_file(offset, &data);
@@ -154,7 +168,8 @@ where
 
         // .flat_map(|vec| vec)
         // let offset = (4 + (index as usize * data.len())) as u64;
-        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        let offset =
+            (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
         println!("bulk write offset: {}", offset);
         // println!("bulk write data length:{}", data.len());
 
@@ -207,7 +222,8 @@ where
 
         // .flat_map(|vec| vec)
         // let offset = (4 + (index as usize * data.len())) as u64;
-        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+        let offset =
+            (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
         println!("bulk write offset: {}", offset);
         // println!("bulk write data length:{}", data.len());
 
@@ -263,7 +279,7 @@ where
         let size_of_object = size_of::<T>();
         let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
-        println!("read offset:{}", offset);
+        // println!("read offset:{}", offset);
 
         let length = size_of_object;
 

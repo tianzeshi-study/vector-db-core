@@ -1,7 +1,20 @@
-use std::fs::{File, OpenOptions};
-use std::io::{self};
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::sync::{Arc, Mutex};
+use std::{
+    fs::{
+        File,
+        OpenOptions,
+    },
+    io::{
+        self,
+        Read,
+        Seek,
+        SeekFrom,
+        Write,
+    },
+    sync::{
+        Arc,
+        Mutex,
+    },
+};
 
 // 定义一个文件访问服务结构体
 pub struct FileAccessService {

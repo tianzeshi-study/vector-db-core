@@ -1,5 +1,10 @@
-use std::convert::TryInto;
-use std::sync::{Arc, Mutex};
+use std::{
+    convert::TryInto,
+    sync::{
+        Arc,
+        Mutex,
+    },
+};
 
 use crate::file_access_service::FileAccessService;
 
@@ -56,7 +61,10 @@ impl StringRepository {
     }
 
     /// 写入字符串内容并返回其偏移量和长度
-    pub fn _write_string_content_and_get_offset(&mut self, bytes_vector: Vec<u8>) -> (u64, u64) {
+    pub fn _write_string_content_and_get_offset(
+        &mut self,
+        bytes_vector: Vec<u8>,
+    ) -> (u64, u64) {
         // dbg!(&bytes_vector);
         // let current_offset;
         let current_offset = self.file_end_offset.lock().unwrap().clone();
@@ -73,7 +81,10 @@ impl StringRepository {
         )
     }
 
-    pub fn write_string_content_and_get_offset(&self, bytes_vector: Vec<u8>) -> (u64, u64) {
+    pub fn write_string_content_and_get_offset(
+        &self,
+        bytes_vector: Vec<u8>,
+    ) -> (u64, u64) {
         // dbg!(&bytes_vector);
         let current_offset = {
             let mut current_offset = self.file_end_offset.lock().unwrap();
@@ -117,7 +128,8 @@ mod test {
     #[test]
     fn test_write_dynamic_repository() {
         // 创建服务实例
-        let mut my_service = StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
+        let mut my_service =
+            StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
         let bytes_vector: Vec<u8> = "hello, world".to_string().as_bytes().to_vec();
         let result = my_service.write_string_content_and_get_offset(bytes_vector);
         println!("{:?}", result);
@@ -125,9 +137,11 @@ mod test {
 
     #[test]
     fn test_load_dynamic_repository() {
-        let my_service = StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
+        let my_service =
+            StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
         let string_bytes = my_service.load_string_content(0, 24);
-        let result = String::from_utf8(string_bytes.clone()).expect("Invalid UTF-8 sequence");
+        let result =
+            String::from_utf8(string_bytes.clone()).expect("Invalid UTF-8 sequence");
         println!("result: {}", result);
     }
 }

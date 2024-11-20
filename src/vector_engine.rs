@@ -1,10 +1,21 @@
-use crate::dynamic_vector_manage_service::DynamicVectorManageService;
-use crate::static_vector_manage_service::StaticVectorManageService;
-use serde::{Deserialize, Serialize};
+use crate::{
+    dynamic_vector_manage_service::DynamicVectorManageService,
+    static_vector_manage_service::StaticVectorManageService,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 pub trait VectorDatabase<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
 {
     fn new(
         structural_repository: String,
@@ -19,7 +30,13 @@ where
 
 impl<T> VectorDatabase<T> for DynamicVectorManageService<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
 {
     fn new(
         structural_repository: String,
@@ -52,7 +69,13 @@ where
 
 impl<T> VectorDatabase<T> for StaticVectorManageService<T>
 where
-    T: Serialize + for<'de> Deserialize<'de> + 'static + std::fmt::Debug + Clone + Send + Sync,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
 {
     fn new(
         structural_repository: String,
