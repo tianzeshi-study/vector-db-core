@@ -35,7 +35,7 @@ where
         + Sync,
 {
     database: Arc<Mutex<D>>,                     // 底层数据库
-    cached_data: Arc<Mutex<Vec<T>>>, // 缓存数据
+    cache: Arc<Mutex<Vec<T>>>, 
     max_cache_items: usize,
 }
 
@@ -61,19 +61,19 @@ where
                 dynamic_repository,
                 initial_size_if_not_exists,
             ))),
-            // cached_data: Arc::new(Mutex::new(Vec::new())),
-            cached_data: Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS))),
+            // cache: Arc::new(Mutex::new(Vec::new())),
+            cache: Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS))),
             max_cache_items: MAX_CACHE_ITEMS,
         }
     }
 
     pub fn push(&self, obj: T) {
-        let mut cache = self.cached_data.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap();
         cache.push(obj);
         let cache_len = cache.len();
         // if cache.len() >= self.max_cache_items {
             if cache_len >= self.max_cache_items {
-            let cache_clone =Arc::clone(&self.cached_data);
+            let cache_clone =Arc::clone(&self.cache);
             let database_clone = Arc::clone(&self.database);
             std::thread::spawn(move || {
             // self.database.extend(cache.to_vec());
@@ -85,7 +85,7 @@ where
     }
 
     pub fn extend(&self, objs: Vec<T>) {
-        let mut cache = self.cached_data.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap();
         let mut objs = objs;
         cache.append(&mut objs);
         /*
@@ -98,13 +98,38 @@ where
 
     let cache_len = cache.len();
         if cache_len >= self.max_cache_items {
-            let cache_clone =Arc::clone(&self.cached_data);
+            let cache_clone =Arc::clone(&self.cache);
             let database_clone = Arc::clone(&self.database);
             std::thread::spawn(move || {
             database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
             *cache_clone.lock().unwrap() = Vec::new();
             });
         }
+    }
+    pub fn get_base_len(&self) -> usize{
+        self.cache.lock().unwrap().len()
+    }
+    
+    pub fn get_cache_len(&self)  -> usize{
+        self.cache.lock().unwrap().len()
+    }
+    pub fn len(&self) ->  usize {
+        self.get_cache_len()  + self.get_base_len()
+    }
+    
+    pub fn getting_obj_from_cache(&self, index: u64) -> T{
+        self.cache.lock().unwrap()[index as usize].clone()
+    }
+    
+    pub fn getting_objs_from_cache(&self, index: u64, count: u64) -> Vec<T>{
+        let end_offset = (index   + count -1) as usize;
+        self.cache.lock().unwrap()[index as usize..end_offset].into()
+    }
+    
+    
+    
+    pub fn get_obj_from_cache(&self, index: u64) -> Option<T>{
+        self.cache.lock().unwrap().get(index as usize).cloned()
     }
 
 }
@@ -121,7 +146,7 @@ where
         + Sync,
 {
     fn drop(&mut self) {
-        let cache = self.cached_data.lock().unwrap();
+        let cache = self.cache.lock().unwrap();
         if cache.len() != 0 {
             self.database.lock().unwrap().extend(cache.to_vec());
         }
@@ -130,7 +155,7 @@ where
 
 pub struct ReadableCache<D, T>
 where
-    D: VectorDatabase<T>,
+    D: VectorDatabase<T> + 'static + Send,
     T: Serialize
         + for<'de> Deserialize<'de>
         + 'static
@@ -149,7 +174,7 @@ where
 
 impl<D, T> ReadableCache<D, T>
 where
-    D: VectorDatabase<T>,
+    D: VectorDatabase<T> + 'static + Send,
     T: Serialize
         + for<'de> Deserialize<'de>
         + 'static
@@ -176,119 +201,24 @@ where
         }
     }
 
-    /// 从文件的指定偏移量读取数据，并使用缓存提高读取效率
-    pub fn pull_lot(&self, index: u64, count: u64) -> Vec<T> {
-        let mut result = Vec::with_capacity(count as usize);
 
-        let mut current_offset = index;
-        let mut remaining_length = count;
-        let mut result_offset = 0;
 
-        while remaining_length > 0 {
-            let page_offset = current_offset / self.page_size;
-            let page_start = current_offset % self.page_size;
-            dbg!(current_offset, self.page_size);
+    // pub fn getting1(&self, index: u64) -> T {
+        // let data = self.get_obj_from_cache(index);
 
-            let bytes_to_read =
-                std::cmp::min(remaining_length, self.page_size - page_start);
+        // data
+    // }
+    
 
-            let page_data = self.get_page_from_cache(index, page_offset as u64);
-            dbg!(&page_data.len());
-            dbg!(result.len(), result_offset, bytes_to_read, page_start);
-            result
-                [result_offset as usize..result_offset as usize + bytes_to_read as usize]
-                .clone_from_slice(
-                    &page_data[page_start as usize
-                        ..page_start as usize + bytes_to_read as usize],
-                );
+    
+    // pub fn getting_lot(&self, index: u64, count : u64) -> Vec<T> {
+        // let data = self.get_objs_from_cache(index, count );
 
-            current_offset += bytes_to_read;
-            result_offset += bytes_to_read;
-            remaining_length -= bytes_to_read;
-        }
-
-        result
-    }
-
+        // data
+    // }
+    
+    // fn get_obj_from_cache(&self, index: u64) -> T {
     pub fn getting(&self, index: u64) -> T {
-        let data = self.get_obj_from_cache(index);
-
-        data
-    }
-    
-
-    
-    pub fn get_lot(&self, index: u64, count : u64) -> Vec<T> {
-        let data = self.get_objs_from_cache(index, count );
-
-        data
-    }
-
-    /// 从缓存中获取页面数据，如果缓存缺失则从文件中读取并添加到缓存
-    fn get_page_from_cache(&self, db_offset: u64, page_offset: u64) -> Vec<T> {
-        // let cache = self.cache.lock().unwrap();
-
-        if let Some(page_data) = self.cache.lock().unwrap().get(&page_offset) {
-            if self.should_update_lru(&page_offset) {
-                let mut lru_list = self.lru_list.lock().unwrap();
-                // lru_list.retain(|&x| x != page_offset);
-                self.remove_item(page_offset);
-                lru_list.push_back(page_offset);
-            }
-
-            return vec![page_data.clone()];
-        }
-
-        // dbg!(page_offset, self.page_size);
-        // let page_data = self.file_access_service.read_in_file(file_offset, page_offset * self.page_size as u64);
-        let read_count = page_offset * self.page_size as u64;
-        // dbg!(db_offset, read_length);
-        let page_data = self.database.pullx(db_offset, read_count);
-
-        self.add_bulk_to_cache(page_offset, page_data.clone());
-
-        page_data
-    }
-
-    fn get_obj_from_cache1(&self, index: u64) -> T {
-        if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
-            if self.should_update_lru(&index) {
-                let mut lru_list = self.lru_list.lock().unwrap();
-                self.remove_item(index); // lru_list.retain(|&x| x != page_offset);
-                lru_list.push_back(index);
-            }
-
-            return page_data.clone();
-        }
-
-        let page_data = self.database.pull(index);
-
-        self.add_to_cache(index, page_data.clone());
-        page_data
-    }
-    
-    fn get_obj_from_cache2(&self, index: u64) -> T {
-        if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
-
-            if self.should_update_lru(&index) {
-            /*
-                let mut lru_list = self.lru_list.lock().unwrap();
-                self.remove_item(index); // lru_list.retain(|&x| x != page_offset);
-                lru_list.push_back(index);
-                */
-                self.update_lru(index);
-            }
-
-            return page_data.clone();
-        }
-
-        let page_data = self.database.pull(index);
-
-        self.add_to_cache(index, page_data.clone());
-        page_data
-    }
-    
-    fn get_obj_from_cache(&self, index: u64) -> T {
         if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
             // println!("checking lru list for index: {}", &index);
             self.check_lru_list(index);
@@ -301,7 +231,8 @@ where
         page_data
     }
     
-    fn get_objs_from_cache(&self, index: u64, count: u64) -> Vec<T> {
+    // pub fn get_objs_from_cache(&self, index: u64, count: u64) -> Vec<T> {
+    pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
 
         let page_data = self.database.pullx(index, count);
 
@@ -310,17 +241,10 @@ where
     }
 
 
-    /// 检查是否需要更新LRU列表中的页面访问记录
-    fn should_update_lru(&self, page_offset: &u64) -> bool {
-        let lru_list = self.lru_list.lock().unwrap();
-        const VERY_RECENT_PAGE_ACCESS_LIMIT: usize = 0x10;
 
-        let mut recent_access = lru_list.iter().rev().take(VERY_RECENT_PAGE_ACCESS_LIMIT);
-        !recent_access.any(|&x| x == *page_offset)
-    }
 
-    /// 将页面数据添加到缓存，如果缓存满则移除最久未使用的页面
-    fn add_to_cache(&self, index: u64, data: T) {
+
+    pub fn add_to_cache(&self, index: u64, data: T) {
         let cache_clone = Arc::clone(&self.cache);
         let lru_list_clone = Arc::clone(&self.lru_list);
         let max_cache_items = self.max_cache_items;
@@ -341,78 +265,11 @@ where
         });
     }
 
-    fn add_bulk_to_cache1(&self, index: u64, datas: Vec<T>) {
-        let mut cache = self.cache.lock().unwrap();
-        let mut lru_list = self.lru_list.lock().unwrap();
 
-        while cache.len() >= self.max_cache_items && !lru_list.is_empty() {
-            if let Some(oldest_page) = lru_list.pop_front() {
-                cache.remove(&oldest_page);
-            }
-        }
-        // let end_index = index + datas.len() as u64 -1;
-        let end_index = index + datas.len() as u64;
-        // [index..end_index].collect()
-
-        let mut cache_c = Arc::clone(&self.cache);
-        let mut lru_list_c = Arc::clone(&self.lru_list);
-
-        datas.par_iter().enumerate().for_each(|(i, data)| {
-            let index = i as u64 + index;
-            let cache_clone = Arc::clone(&cache_c);
-
-            let lru_list_clone = Arc::clone(&lru_list_c);
-
-            cache_clone.lock().unwrap().insert(index, data.clone());
-            lru_list_clone.lock().unwrap().push_back(index);
-        });
-    }
-    
-    fn add_bulk_to_cache2(&self, index: u64, datas: Vec<T>) {
-        /*
-        let mut cache = self.cache.lock().unwrap();
-        let mut lru_list = self.lru_list.lock().unwrap();
-        let mut cache_clone  = Arc::clone(&self.cache);
-        let mut lru_list_clone = Arc::clone(&self.lru_list);
-let new map = datas.par_iter()
-.enumerate()
-.for_each((i, obj)| {
-    let cache_index = i +index;
-    let cache = cache_clone.lock().unwrap();
-    let lru_list = lru_list_clone.lock().unwrap();
-    cache.insert(cache_index, obj);
-    lru_list.push_back(cache_index);
-});
-*/
-
-        let mut cache = self.cache.lock().unwrap();
-        let mut lru_list = self.lru_list.lock().unwrap();
     
 
-        while cache.len() >= self.max_cache_items && !lru_list.is_empty() {
-            if let Some(oldest_page) = lru_list.pop_front() {
-                cache.remove(&oldest_page);
-            }
-        }
-        // let end_index = index + datas.len() as u64 -1;
-        let end_index = index + datas.len() as u64;
-        // [index..end_index].collect()
-
-        let mut cache_c = Arc::clone(&self.cache);
-        let mut lru_list_c = Arc::clone(&self.lru_list);
-
-        datas.par_iter().enumerate().for_each(|(i, data)| {
-            let index = i as u64 + index;
-            let cache_clone = Arc::clone(&cache_c);
-            let lru_list_clone = Arc::clone(&lru_list_c);
-
-
-            cache_clone.lock().unwrap().insert(index, data.clone());
-            lru_list_clone.lock().unwrap().push_back(index);
-        });
-    }
     
-    fn add_bulk_to_cache(&self, index: u64, objs: Vec<T>) {
+    pub fn add_bulk_to_cache(&self, index: u64, objs: Vec<T>) {
         let mut cache_clone  = Arc::clone(&self.cache);
         let mut lru_list_clone = Arc::clone(&self.lru_list);
         let objs_len = objs.len();
@@ -458,47 +315,9 @@ let (cache_hashmap, mut cache_linklist): (HashMap<u64, T>, LinkedList<u64>)  = o
 
     }
 
-    fn remove_item(&self, page: u64) {
-        let mut lru_list = self.lru_list.lock().unwrap();
 
-        let mut current = lru_list.front(); // 从列表的前端开始
-
-        while let Some(&value) = current {
-            // 获取当前节点的值
-            if value == page {
-                // 如果值与要删除的元素匹配，使用 pop_front() 删除元素
-                lru_list.pop_front(); // 删除头部元素
-                                      // 更新 current 为下一个元素
-                current = lru_list.front(); // 更新为新头部
-            } else {
-                // 继续检查下一个元素
-                current = lru_list.iter().nth(1).or_else(|| None); // 获取下一个元素
-            }
-        }
-    }
     
-    fn update_lru(&self, index: u64) {
-        let lru_list_clone = Arc::clone(&self.lru_list);
-        
-        let mut lru_list = lru_list_clone.lock().unwrap();
 
-        let mut current = lru_list.front(); // 从列表的前端开始
-
-        while let Some(&value) = current {
-            // 获取当前节点的值
-            if value == index {
-                // 如果值与要删除的元素匹配，使用 pop_front() 删除元素
-                lru_list.pop_front(); // 删除头部元素
-                                      // 更新 current 为下一个元素
-                current = lru_list.front(); // 更新为新头部
-            } else {
-                // 继续检查下一个元素
-                current = lru_list.iter().nth(1).or_else(|| None); // 获取下一个元素
-            }
-        }
-                lru_list.push_back(index);
-
-    }
     
     fn check_lru_list(&self, index: u64) {
         let lru_list_clone = Arc::clone(&self.lru_list);
@@ -533,6 +352,129 @@ let (cache_hashmap, mut cache_linklist): (HashMap<u64, T>, LinkedList<u64>)  = o
     }
     
 }
+
+pub struct databaseWithCache<D, T>
+where
+    D: VectorDatabase<T> + 'static + Send +Sync,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
+{
+    writable_cache: WritableCache<D, T>,
+    readable_cache: ReadableCache<D, T>,
+    origin_database: D,
+}
+
+impl<D, T> databaseWithCache<D, T>
+where
+    D: VectorDatabase<T> + 'static + Send + Sync,
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
+{
+    pub fn new(
+        static_repository: String,
+        dynamic_repository: String,
+        initial_size_if_not_exists: u64,
+    ) -> Self {
+        Self {
+            writable_cache: WritableCache::new(
+                static_repository.clone(),
+                dynamic_repository.clone(),
+                initial_size_if_not_exists.clone(),
+            ),
+            readable_cache: ReadableCache::new(
+                static_repository.clone(),
+                dynamic_repository.clone(),
+                initial_size_if_not_exists.clone(),
+            ),
+            origin_database: VectorDatabase::new(
+                static_repository,
+                dynamic_repository,
+                initial_size_if_not_exists,
+            ),
+        }
+    }
+    pub fn len(&self) -> usize{
+        self.writable_cache.len()
+    }  
+    
+    pub fn push(&self, obj:T) {
+        self.writable_cache.push(obj);
+    }
+    
+    pub fn extend(&self, objs: Vec<T> ) {
+        self.extend(objs);
+    }
+    
+    pub fn getting(&self, index: u64)  -> T{
+        let total_count = self.len() as u64;
+        let cache_count  = self.writable_cache.get_cache_len() as u64;
+        let base_count = self.writable_cache.get_base_len() as u64; 
+let obj = if index <= base_count {
+    self.readable_cache.getting(index)
+} else if index >base_count && index <= total_count {
+    let obj = self.writable_cache.getting_obj_from_cache(index - base_count);
+self.readable_cache.add_to_cache(index, obj.clone());
+obj
+} else {
+    panic!("out of index!");
+};
+
+obj
+    }
+    
+    pub fn get(&self, index: u64)  -> Option<T>{
+        let total_count = self.len() as u64;
+        let cache_count  = self.writable_cache.get_cache_len() as u64;
+        let base_count = self.writable_cache.get_base_len() as u64; 
+let obj = if index <= base_count {
+    Some(self.readable_cache.getting(index))
+} else if index >base_count && index <= total_count {
+    Some(self.writable_cache.getting_obj_from_cache(index - base_count))
+} else {
+    None
+};
+if let Some(ref o) = obj { 
+self.readable_cache.add_to_cache(index, o.clone());
+}
+
+obj
+    }
+    
+    pub fn getting_lot(&self, index: u64, count: u64 )  -> Vec<T>{
+        let total_count = self.len() as u64;
+        let cache_count  = self.writable_cache.get_cache_len() as u64;
+        let base_count = self.writable_cache.get_base_len() as u64;
+        let end_offset = index + count;
+let objs = if end_offset <= base_count {
+    self.readable_cache.getting_lot(index, count)
+} else if index >base_count && end_offset <= total_count {
+    self.writable_cache.getting_objs_from_cache(index - base_count, end_offset - base_count)
+    } else if index <= base_count && end_offset <= total_count {
+        let mut front = self.readable_cache.getting_lot(index, base_count - index);
+        let mut back =  self.writable_cache.getting_objs_from_cache(0 , end_offset - base_count);
+        front.append(&mut back);
+        front
+        } else {
+    panic!("out of index!");
+};
+self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
+objs
+    }
+    
+    
+}
+
 
 #[cfg(test)]
 mod test {
@@ -701,47 +643,10 @@ mod test {
         my_service.extend(objs);
     }
 
-    #[test]
-    fn test_pull_lot_static_from_cache() {
-        let mut objs = Vec::new();
-        let my_service = WritableCache::<
-            StaticVectorManageService<StaticStruct>,
-            StaticStruct,
-        >::new(
-            "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
-        );
-        let read_cache_service =
-            ReadableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-                "cacheS.bin".to_string(),
-                "cacheSD.bin".to_string(),
-                1024,
-            );
-        for i in 0..COUNT {
-            let my_obj: StaticStruct = StaticStruct {
-                my_usize: 443 + i,
-                my_u64: 53,
-                my_u32: 4399,
-                my_u16: 3306,
-                my_u8: 22,
-                my_boolean: true,
-            };
 
-            objs.push(my_obj);
-        }
-        let start = Instant::now();
-        my_service.extend(objs);
-        let extend_cache_duration = start.elapsed();
-        println!("extend cache duration: {:?}", extend_cache_duration);
-        read_cache_service.pull_lot(0, COUNT as u64);
-        let pull_lot_cache_duration = start.elapsed();
-        println!(
-            "pull lot cache duration: {:?}",
-            pull_lot_cache_duration - extend_cache_duration
-        );
-    }
     
     #[test]
-    fn test_get_lot_static_from_cache() {
+    fn test_getting_lot_static_from_cache() {
         let mut objs = Vec::new();
         let my_service = WritableCache::<
             StaticVectorManageService<StaticStruct>,
@@ -771,11 +676,11 @@ mod test {
         my_service.extend(objs);
         let extend_cache_duration = start.elapsed();
         println!("extend cache duration: {:?}", extend_cache_duration);
-        read_cache_service.get_lot(0, COUNT as u64);
-        let get_lot_cache_duration = start.elapsed();
+        read_cache_service.getting_lot(0, COUNT as u64);
+        let getting_lot_cache_duration = start.elapsed();
         println!(
             "get lot cache duration: {:?}",
-            get_lot_cache_duration - extend_cache_duration
+            getting_lot_cache_duration - extend_cache_duration
         );
     }
 

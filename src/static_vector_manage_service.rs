@@ -56,9 +56,7 @@ where
     ) -> io::Result<Self> {
         let structure_file_access =
             FileAccessService::new(structure_file_path, initial_size_if_not_exists);
-        // let _ = std::fs::create_dir_all(&string_file_path);
-        // let string_repository = StringRepository::new(string_file_path.clone(), initial_size_if_not_exists);
-        // let length = get_length();
+
         let length = {
             let buffer = structure_file_access.read_in_file(0, LENGTH_MARKER_SIZE);
             // 确保 buffer 的长度至少为 4

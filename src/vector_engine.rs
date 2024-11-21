@@ -26,6 +26,7 @@ where
     fn extend(&self, objs: Vec<T>);
     fn pull(&self, index: u64) -> T;
     fn pullx(&self, index: u64, count: u64) -> Vec<T>;
+    fn len(&self) -> usize;
 }
 
 impl<T> VectorDatabase<T> for DynamicVectorManageService<T>
@@ -65,6 +66,9 @@ where
     fn pullx(&self, index: u64, count: u64) -> Vec<T> {
         self.load_bulk(index, count)
     }
+    fn len(&self) -> usize {
+        self.get_length() as usize 
+    }
 }
 
 impl<T> VectorDatabase<T> for StaticVectorManageService<T>
@@ -103,5 +107,8 @@ where
     }
     fn pullx(&self, index: u64, count: u64) -> Vec<T> {
         self.read_bulk(index, count)
+    }
+    fn len(&self) -> usize {
+        self.get_length() as usize 
     }
 }
