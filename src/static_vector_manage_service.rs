@@ -130,7 +130,7 @@ where
         let size_of_object = size_of::<T>();
         let count = objs.len();
         let mut buffer: Vec<u8> = vec![0; size_of_object * count];
-        println!("length of buffer: {}", buffer.len());
+        // println!("length of buffer: {}", buffer.len());
 
         // let data: Vec<u8> = objs.par_iter()
         // .map(|obj| Self::serialize_object(obj))
@@ -161,16 +161,16 @@ where
             .par_iter()
             .map(|obj| Self::serialize_object(obj))
             .collect::<Vec<Vec<u8>>>();
-        println!("bulk write size_of_object:{}", size_of_object);
-        println!("length of  vec_data:{}", vec_data.len());
-        println!("length of  item of vec_data:{}", vec_data[0].len());
-        println!("bytes of vec_data:{}", vec_data[0].len() * vec_data.len());
+        // println!("bulk write size_of_object:{}", size_of_object);
+        // println!("length of  vec_data:{}", vec_data.len());
+        // println!("length of  item of vec_data:{}", vec_data[0].len());
+        // println!("bytes of vec_data:{}", vec_data[0].len() * vec_data.len());
 
         // .flat_map(|vec| vec)
         // let offset = (4 + (index as usize * data.len())) as u64;
         let offset =
             (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
-        println!("bulk write offset: {}", offset);
+        // println!("bulk write offset: {}", offset);
         // println!("bulk write data length:{}", data.len());
 
         let file_guard = self.structure_file.lock().unwrap();
@@ -256,7 +256,7 @@ where
             self.save_length(*length);
             index
         };
-        println!("add bulk index_to_write:{}", index_to_write);
+        // println!("add bulk index_to_write:{}", index_to_write);
         self.bulk_write_index(index_to_write.into(), objs);
     }
 
@@ -298,9 +298,9 @@ where
     pub fn read_bulk(&self, index: u64, count: u64) -> Vec<T> {
         let size_of_object = size_of::<T>();
         let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
-        println!("read offset:{}", offset);
+        // println!("read offset:{}", offset);
         let length = count as usize * size_of_object;
-        println!("read length:{}", length);
+        // println!("read length:{}", length);
 
         let file_guard = self.structure_file.lock().unwrap();
         let data: Vec<u8> = file_guard.read_in_file(offset, length);

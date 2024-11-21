@@ -21,11 +21,11 @@ use crate::{
 };
 
 const PAGE_SIZE: u64 = 5000;
-const MAX_CACHE_ITEMS: usize = 900000;
+const MAX_CACHE_ITEMS: usize = 500;
 
 pub struct WritableCache<D, T>
 where
-    D: VectorDatabase<T>,
+    D: VectorDatabase<T> +Sync +Send + 'static,
     T: Serialize
         + for<'de> Deserialize<'de>
         + 'static
@@ -34,14 +34,14 @@ where
         + Send
         + Sync,
 {
-    database: D,                     // 底层数据库
+    database: Arc<Mutex<D>>,                     // 底层数据库
     cached_data: Arc<Mutex<Vec<T>>>, // 缓存数据
     max_cache_items: usize,
 }
 
 impl<D, T> WritableCache<D, T>
 where
-    D: VectorDatabase<T>,
+    D: VectorDatabase<T> +Sync +Send + 'static,
     T: Serialize
         + for<'de> Deserialize<'de>
         + 'static
@@ -56,11 +56,11 @@ where
         initial_size_if_not_exists: u64,
     ) -> Self {
         Self {
-            database: VectorDatabase::new(
+            database: Arc::new(Mutex::new(VectorDatabase::new(
                 static_repository,
                 dynamic_repository,
                 initial_size_if_not_exists,
-            ),
+            ))),
             // cached_data: Arc::new(Mutex::new(Vec::new())),
             cached_data: Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS))),
             max_cache_items: MAX_CACHE_ITEMS,
@@ -70,9 +70,17 @@ where
     pub fn push(&self, obj: T) {
         let mut cache = self.cached_data.lock().unwrap();
         cache.push(obj);
-        if cache.len() >= self.max_cache_items {
-            self.database.extend(cache.to_vec());
-            *cache = Vec::new();
+        let cache_len = cache.len();
+        // if cache.len() >= self.max_cache_items {
+            if cache_len >= self.max_cache_items {
+            let cache_clone =Arc::clone(&self.cached_data);
+            let database_clone = Arc::clone(&self.database);
+            std::thread::spawn(move || {
+            // self.database.extend(cache.to_vec());
+            // *cache = Vec::new();
+            database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
+            *cache_clone.lock().unwrap() = Vec::new();
+            });
         }
     }
 
@@ -80,16 +88,30 @@ where
         let mut cache = self.cached_data.lock().unwrap();
         let mut objs = objs;
         cache.append(&mut objs);
+        /*
         if cache.len() >= self.max_cache_items {
             self.database.extend(cache.to_vec());
             *cache = Vec::new();
         }
+
+    */
+
+    let cache_len = cache.len();
+        if cache_len >= self.max_cache_items {
+            let cache_clone =Arc::clone(&self.cached_data);
+            let database_clone = Arc::clone(&self.database);
+            std::thread::spawn(move || {
+            database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
+            *cache_clone.lock().unwrap() = Vec::new();
+            });
+        }
     }
+
 }
 
 impl<D, T> Drop for WritableCache<D, T>
 where
-    D: VectorDatabase<T>,
+    D: VectorDatabase<T> +Sync +Send + 'static,
     T: Serialize
         + for<'de> Deserialize<'de>
         + 'static
@@ -101,7 +123,7 @@ where
     fn drop(&mut self) {
         let cache = self.cached_data.lock().unwrap();
         if cache.len() != 0 {
-            self.database.extend(cache.to_vec());
+            self.database.lock().unwrap().extend(cache.to_vec());
         }
     }
 }
@@ -188,11 +210,14 @@ where
         result
     }
 
-    pub fn get(&self, index: u64) -> T {
+    pub fn getting(&self, index: u64) -> T {
         let data = self.get_obj_from_cache(index);
 
         data
     }
+    
+
+    
     pub fn get_lot(&self, index: u64, count : u64) -> Vec<T> {
         let data = self.get_objs_from_cache(index, count );
 
@@ -225,7 +250,7 @@ where
         page_data
     }
 
-    fn get_obj_from_cache(&self, index: u64) -> T {
+    fn get_obj_from_cache1(&self, index: u64) -> T {
         if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
             if self.should_update_lru(&index) {
                 let mut lru_list = self.lru_list.lock().unwrap();
@@ -233,6 +258,40 @@ where
                 lru_list.push_back(index);
             }
 
+            return page_data.clone();
+        }
+
+        let page_data = self.database.pull(index);
+
+        self.add_to_cache(index, page_data.clone());
+        page_data
+    }
+    
+    fn get_obj_from_cache2(&self, index: u64) -> T {
+        if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
+
+            if self.should_update_lru(&index) {
+            /*
+                let mut lru_list = self.lru_list.lock().unwrap();
+                self.remove_item(index); // lru_list.retain(|&x| x != page_offset);
+                lru_list.push_back(index);
+                */
+                self.update_lru(index);
+            }
+
+            return page_data.clone();
+        }
+
+        let page_data = self.database.pull(index);
+
+        self.add_to_cache(index, page_data.clone());
+        page_data
+    }
+    
+    fn get_obj_from_cache(&self, index: u64) -> T {
+        if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
+            // println!("checking lru list for index: {}", &index);
+            self.check_lru_list(index);
             return page_data.clone();
         }
 
@@ -262,17 +321,24 @@ where
 
     /// 将页面数据添加到缓存，如果缓存满则移除最久未使用的页面
     fn add_to_cache(&self, index: u64, data: T) {
-        let mut cache = self.cache.lock().unwrap();
-        let mut lru_list = self.lru_list.lock().unwrap();
+        let cache_clone = Arc::clone(&self.cache);
+        let lru_list_clone = Arc::clone(&self.lru_list);
+        let max_cache_items = self.max_cache_items;
+        std::thread::spawn(move || {
+        // let mut cache = cache_clone.lock().unwrap();
+        let mut lru_list = lru_list_clone.lock().unwrap();
 
-        while cache.len() >= self.max_cache_items && !lru_list.is_empty() {
+        // while cache.len() >= max_cache_items && !lru_list.is_empty() {
+        while lru_list.len() >= max_cache_items && !lru_list.is_empty() {
             if let Some(oldest_page) = lru_list.pop_front() {
-                cache.remove(&oldest_page);
+            cache_clone.lock().unwrap().remove(&oldest_page);
             }
+
         }
 
-        cache.insert(index, data);
+        cache_clone.lock().unwrap().insert(index, data);
         lru_list.push_back(index);
+        });
     }
 
     fn add_bulk_to_cache1(&self, index: u64, datas: Vec<T>) {
@@ -376,14 +442,14 @@ let (cache_hashmap, mut cache_linklist): (HashMap<u64, T>, LinkedList<u64>)  = o
     // let cache_clone = Arc::clone(&self.cache);
     // let lru_list_clone  = Arc::clone(&self.lru_list);
 // std::thread::spawn(move ||{
-    let mut cache = cache_clone.lock().unwrap();
-    cache.extend(cache_hashmap.into_iter());
+    // let mut cache = cache_clone.lock().unwrap();
+    cache_clone.lock().unwrap().extend(cache_hashmap.into_iter());
     let mut lru_list = lru_list_clone.lock().unwrap();
     lru_list.append(&mut cache_linklist); 
     
-    while cache.len() >= max_cache_items && !lru_list.is_empty() {
+    while lru_list.len() >= max_cache_items && !lru_list.is_empty() {
             if let Some(oldest_page) = lru_list.pop_front() {
-                cache.remove(&oldest_page);
+                cache_clone.lock().unwrap().remove(&oldest_page);
             }
         }
         
@@ -410,6 +476,62 @@ let (cache_hashmap, mut cache_linklist): (HashMap<u64, T>, LinkedList<u64>)  = o
             }
         }
     }
+    
+    fn update_lru(&self, index: u64) {
+        let lru_list_clone = Arc::clone(&self.lru_list);
+        
+        let mut lru_list = lru_list_clone.lock().unwrap();
+
+        let mut current = lru_list.front(); // 从列表的前端开始
+
+        while let Some(&value) = current {
+            // 获取当前节点的值
+            if value == index {
+                // 如果值与要删除的元素匹配，使用 pop_front() 删除元素
+                lru_list.pop_front(); // 删除头部元素
+                                      // 更新 current 为下一个元素
+                current = lru_list.front(); // 更新为新头部
+            } else {
+                // 继续检查下一个元素
+                current = lru_list.iter().nth(1).or_else(|| None); // 获取下一个元素
+            }
+        }
+                lru_list.push_back(index);
+
+    }
+    
+    fn check_lru_list(&self, index: u64) {
+        let lru_list_clone = Arc::clone(&self.lru_list);
+        let cache_clone = Arc::clone(&self.cache);
+        std::thread::spawn(move  || {
+        
+        let mut lru_list = lru_list_clone.lock().unwrap();
+                const VERY_RECENT_PAGE_ACCESS_LIMIT: usize = 0x10;
+
+        let mut recent_access = lru_list.iter().rev().take(VERY_RECENT_PAGE_ACCESS_LIMIT);
+
+        if !recent_access.any(|&x| x == index) { 
+        let mut current = lru_list.front(); // 从列表的前端开始
+
+        let mut index =0;
+            let mut cursor = lru_list.cursor_front_mut();
+
+        // while let Some(&value) = current {
+            while let Some(value) = cursor.current() {
+            if *value == index {
+            cursor.remove_current();
+            break; 
+            // 更新 current 为下一个元素
+
+            } else {
+                cursor.move_next(); 
+            }
+        }
+                lru_list.push_back(index);
+        }
+        });
+    }
+    
 }
 
 #[cfg(test)]
@@ -419,7 +541,8 @@ mod test {
         dynamic_vector_manage_service::DynamicVectorManageService,
         static_vector_manage_service::StaticVectorManageService,
     };
-    const COUNT: usize = 1000000;
+    const COUNT: usize = 1000;
+    const TURNS: usize = 100;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
     pub struct StaticStruct {
@@ -479,6 +602,30 @@ mod test {
         }
         // my_service.add_bulk(objs);
     }
+    
+    #[test]
+    fn test_one_by_one_getting_static() {
+        let my_service = ReadableCache::<
+            StaticVectorManageService<StaticStruct>,
+            StaticStruct,
+        >::new(
+            "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
+        );
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+            // my_vec.push(i as u64 *1000);
+
+            // my_service.push(my_obj);
+            my_service.getting(i as u64);
+        }
+    }
 
     #[test]
     fn test_one_by_one_push_dynamic() {
@@ -503,6 +650,31 @@ mod test {
             my_service.push(my_obj);
         }
         // my_service.add_bulk(objs);
+    }
+    
+    #[test]
+    fn test_one_by_one_getting_dynamic() {
+
+        let my_service = ReadableCache::<
+            DynamicVectorManageService<StaticStruct>,
+            StaticStruct,
+        >::new(
+            "cacheD.bin".to_string(), "cacheDD.bin".to_string(), 1024
+        );
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+            // my_vec.push(i as u64 *1000);
+
+            my_service.getting(i as u64);
+        }
+
     }
 
     #[test]
@@ -608,7 +780,7 @@ mod test {
     }
 
     #[test]
-    fn test_get_static_from_cache() {
+    fn test_getting_static_multi_turns() {
         let mut objs = Vec::new();
         let my_service = WritableCache::<
             StaticVectorManageService<StaticStruct>,
@@ -638,9 +810,9 @@ mod test {
         my_service.extend(objs);
         let extend_cache_duration = start.elapsed();
         println!("extend cache duration: {:?}", extend_cache_duration);
-        for turn  in  0..3 {
+        for turn  in  0..TURNS {
             for i in 0..COUNT {
-                let obj = read_cache_service.get(i as u64);
+                let obj = read_cache_service.getting(i as u64);
                 // dbg!(obj);
             }
         }
