@@ -21,7 +21,7 @@ use crate::{
 };
 
 const PAGE_SIZE: u64 = 5000;
-const MAX_CACHE_ITEMS: usize = 500;
+const MAX_CACHE_ITEMS: usize = 102400;
 
 pub struct WritableCache<D, T>
 where
@@ -71,15 +71,20 @@ where
         let mut cache = self.cache.lock().unwrap();
         cache.push(obj);
         let cache_len = cache.len();
-        // if cache.len() >= self.max_cache_items {
-            if cache_len >= self.max_cache_items {
+        let max_cache_items = self.max_cache_items;
+        if cache.len() >= self.max_cache_items {
+            // if cache_len >= self.max_cache_items {
             let cache_clone =Arc::clone(&self.cache);
             let database_clone = Arc::clone(&self.database);
             std::thread::spawn(move || {
             // self.database.extend(cache.to_vec());
             // *cache = Vec::new();
-            database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
-            *cache_clone.lock().unwrap() = Vec::new();
+            // dbg!(cache_clone.lock().unwrap().len());
+            // database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
+            // *cache_clone.lock().unwrap() = Vec::new();
+            let mut  objs =  Vec::with_capacity(max_cache_items);
+            objs.append(&mut *cache_clone.lock().unwrap());
+            database_clone.lock().unwrap().extend(objs);
             });
         }
     }
@@ -88,33 +93,38 @@ where
         let mut cache = self.cache.lock().unwrap();
         let mut objs = objs;
         cache.append(&mut objs);
-        /*
-        if cache.len() >= self.max_cache_items {
-            self.database.extend(cache.to_vec());
-            *cache = Vec::new();
-        }
 
-    */
 
     let cache_len = cache.len();
-        if cache_len >= self.max_cache_items {
+        // if cache_len >= self.max_cache_items {
+        if cache.len() >= self.max_cache_items {
             let cache_clone =Arc::clone(&self.cache);
             let database_clone = Arc::clone(&self.database);
+            let max_cache_items = self.max_cache_items;
             std::thread::spawn(move || {
-            database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
-            *cache_clone.lock().unwrap() = Vec::new();
+            // database_clone.lock().unwrap().extend(cache_clone.lock().unwrap().to_vec());
+            // *cache_clone.lock().unwrap() = Vec::new();
+            let mut  objs =  Vec::with_capacity(max_cache_items);
+            objs.append(&mut *cache_clone.lock().unwrap());
+            database_clone.lock().unwrap().extend(objs);
             });
         }
     }
+    
     pub fn get_base_len(&self) -> usize{
-        self.cache.lock().unwrap().len()
+        self.database.lock().unwrap().len()
     }
     
     pub fn get_cache_len(&self)  -> usize{
         self.cache.lock().unwrap().len()
     }
     pub fn len(&self) ->  usize {
-        self.get_cache_len()  + self.get_base_len()
+        // dbg!(self.get_cache_len()  , self.get_base_len());
+        let (cache_len, base_len)  = (self.get_cache_len(), self.get_base_len());
+        dbg!(&cache_len, &base_len);
+        let length =  cache_len +base_len;
+        dbg!(&length);
+        length
     }
     
     pub fn getting_obj_from_cache(&self, index: u64) -> T{
@@ -146,9 +156,17 @@ where
         + Sync,
 {
     fn drop(&mut self) {
-        let cache = self.cache.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap();
+        let max_cache_items =self.max_cache_items;
+        let cache_len  = cache.len();
+        println!("prepare to drop  {} item of cache ", cache_len); 
         if cache.len() != 0 {
-            self.database.lock().unwrap().extend(cache.to_vec());
+            println!("dropping {} item of cache ", cache_len); 
+            // self.database.lock().unwrap().extend(cache.to_vec());
+            // *cache = Vec::with_capacity(max_cache_items);
+            let mut  objs =  Vec::with_capacity(max_cache_items);
+            objs.append(&mut *cache);
+            self.database.lock().unwrap().extend(objs);
         }
     }
 }
@@ -353,7 +371,7 @@ let (cache_hashmap, mut cache_linklist): (HashMap<u64, T>, LinkedList<u64>)  = o
     
 }
 
-pub struct databaseWithCache<D, T>
+pub struct DatabaseWithCache<D, T>
 where
     D: VectorDatabase<T> + 'static + Send +Sync,
     T: Serialize
@@ -369,7 +387,7 @@ where
     origin_database: D,
 }
 
-impl<D, T> databaseWithCache<D, T>
+impl<D, T> DatabaseWithCache<D, T>
 where
     D: VectorDatabase<T> + 'static + Send + Sync,
     T: Serialize
@@ -426,7 +444,7 @@ let obj = if index <= base_count {
 self.readable_cache.add_to_cache(index, obj.clone());
 obj
 } else {
-    panic!("out of index!");
+    panic!("out of index: {}!", index);
 };
 
 obj
@@ -439,13 +457,15 @@ obj
 let obj = if index <= base_count {
     Some(self.readable_cache.getting(index))
 } else if index >base_count && index <= total_count {
-    Some(self.writable_cache.getting_obj_from_cache(index - base_count))
+    let o = self.writable_cache.getting_obj_from_cache(index - base_count);
+    self.readable_cache.add_to_cache(index, o.clone());
+    Some(o)
 } else {
     None
 };
-if let Some(ref o) = obj { 
-self.readable_cache.add_to_cache(index, o.clone());
-}
+// if let Some(ref o) = obj { 
+// self.readable_cache.add_to_cache(index, o.clone());
+// }
 
 obj
     }
@@ -458,16 +478,46 @@ obj
 let objs = if end_offset <= base_count {
     self.readable_cache.getting_lot(index, count)
 } else if index >base_count && end_offset <= total_count {
-    self.writable_cache.getting_objs_from_cache(index - base_count, end_offset - base_count)
+    let objs = self.writable_cache.getting_objs_from_cache(index - base_count, end_offset - base_count);
+    self.readable_cache.add_bulk_to_cache(index, objs.clone());
+    objs
     } else if index <= base_count && end_offset <= total_count {
         let mut front = self.readable_cache.getting_lot(index, base_count - index);
         let mut back =  self.writable_cache.getting_objs_from_cache(0 , end_offset - base_count);
+        self.readable_cache.add_bulk_to_cache(base_count, back.clone());
+        
         front.append(&mut back);
         front
         } else {
     panic!("out of index!");
 };
-self.readable_cache.add_bulk_to_cache(index, objs.clone());
+// self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
+objs
+    }
+    
+    pub fn get_lot(&self, index: u64, count: u64 )  -> Option<Vec<T>>{
+        let total_count = self.len() as u64;
+        let cache_count  = self.writable_cache.get_cache_len() as u64;
+        let base_count = self.writable_cache.get_base_len() as u64;
+        let end_offset = index + count;
+let objs = if end_offset <= base_count {
+    Some(self.readable_cache.getting_lot(index, count))
+} else if index >base_count && end_offset <= total_count {
+    let objs = self.writable_cache.getting_objs_from_cache(index - base_count, end_offset - base_count);
+    self.readable_cache.add_bulk_to_cache(index, objs.clone());
+    Some(objs)
+    } else if index <= base_count && end_offset <= total_count {
+        let mut front = self.readable_cache.getting_lot(index, base_count - index);
+        let mut back =  self.writable_cache.getting_objs_from_cache(0 , end_offset - base_count);
+        self.readable_cache.add_bulk_to_cache(base_count, back.clone());
+        
+        front.append(&mut back);
+        Some(front)
+        } else {
+    None
+};
+// self.readable_cache.add_bulk_to_cache(index, objs.clone());
 
 objs
     }
@@ -484,7 +534,7 @@ mod test {
         static_vector_manage_service::StaticVectorManageService,
     };
     const COUNT: usize = 1000;
-    const TURNS: usize = 100;
+    const TURNS: usize = 5;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
     pub struct StaticStruct {
@@ -776,5 +826,82 @@ mod test {
             // my_service.add(my_obj);
         }
         my_service.add_bulk(objs);
+    }
+
+}
+
+// Test the DatabaseWithCache functionality
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        dynamic_vector_manage_service::DynamicVectorManageService,
+        static_vector_manage_service::StaticVectorManageService,
+    };
+    
+    // Define a simple structure for testing
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct TestData {
+    value: i32,
+}
+
+    #[test]
+    fn test_new() {
+        let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
+            "static_repo.bin".to_string(),
+            "dynamic_repo.bin".to_string(),
+            100,
+        );
+
+        assert_eq!(db.len(), 0);
+    }
+
+    #[test]
+    fn test_push_and_len() {
+        let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
+            "static_repo.bin".to_string(),
+            "dynamic_repo.bin".to_string(),
+            100,
+        );
+
+        let item = TestData { value: 42 };
+        db.push(item.clone());
+
+        // assert_eq!(db.len(), 1);
+    }
+
+    #[test]
+    fn test_getting() {
+        let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
+            "static_repo.bin".to_string(),
+            "dynamic_repo.bin".to_string(),
+            100,
+        );
+
+        let item = TestData { value: 42 };
+        db.push(item.clone());
+
+        let retrieved = db.getting(0);
+        assert_eq!(retrieved.value, 42);
+    }
+
+    #[test]
+    fn test_get_lot() {
+        let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
+            "static_repo.bin".to_string(),
+            "dynamic_repo.bin".to_string(),
+            100,
+        );
+
+        let item1 = TestData { value: 42 };
+        let item2 = TestData { value: 84 };
+
+        db.push(item1.clone());
+        db.push(item2.clone());
+
+        let items = db.get_lot(0, 2).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].value, 42);
+        assert_eq!(items[1].value, 84);
     }
 }
