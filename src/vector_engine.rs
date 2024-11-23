@@ -7,7 +7,7 @@ use serde::{
     Serialize,
 };
 
-pub trait VectorDatabase<T>
+pub trait VectorEngine<T>
 where
     T: Serialize
         + for<'de> Deserialize<'de>
@@ -29,7 +29,7 @@ where
     fn len(&self) -> usize;
 }
 
-impl<T> VectorDatabase<T> for DynamicVectorManageService<T>
+impl<T> VectorEngine<T> for DynamicVectorManageService<T>
 where
     T: Serialize
         + for<'de> Deserialize<'de>
@@ -67,11 +67,11 @@ where
         self.load_bulk(index, count)
     }
     fn len(&self) -> usize {
-        self.get_length() as usize 
+        self.get_length() as usize
     }
 }
 
-impl<T> VectorDatabase<T> for StaticVectorManageService<T>
+impl<T> VectorEngine<T> for StaticVectorManageService<T>
 where
     T: Serialize
         + for<'de> Deserialize<'de>
@@ -109,6 +109,6 @@ where
         self.read_bulk(index, count)
     }
     fn len(&self) -> usize {
-        self.get_length() as usize 
+        self.get_length() as usize
     }
 }

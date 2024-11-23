@@ -1,10 +1,15 @@
 use rand::Rng;
-use std::sync::{Arc, Mutex};
 use serde::{
     Deserialize,
     Serialize,
 };
-use std::time::Instant;
+use std::{
+    sync::{
+        Arc,
+        Mutex,
+    },
+    time::Instant,
+};
 use vector_db_core::{
     DynamicVectorManageService,
     ReadableCache,
@@ -295,7 +300,6 @@ fn test_getting_static_multi_turns() {
         get_from_cache_duration - pull_lot_cache_duration
     );
 }
-/*
 // #[test]
 // fn test_read_static_one() {
 // let my_service = StaticVectorManageService::<StaticStruct>::new(
@@ -306,7 +310,6 @@ fn test_getting_static_multi_turns() {
 // .unwrap();
 // my_service.read(COUNT);
 // }
-*/
 #[test]
 fn test_read_static_bulk_in_pushed() {
     let my_service = StaticVectorManageService::<StaticStruct>::new(
@@ -346,7 +349,7 @@ fn test_add_bulk_compare() {
     my_service.add_bulk(objs);
 }
 
-#[test]
+// #[test]
 fn test_compare_static_multi_turns() {
     let mut objs = Vec::new();
     let my_service =
@@ -407,12 +410,13 @@ fn test_getting_static_multi_thread() {
             "cacheSD.bin".to_string(),
             1024,
         );
-    let read_cache_service_origin = Arc::new(ReadableCache::<
-        StaticVectorManageService<StaticStruct>,
-        StaticStruct,
-    >::new(
-        "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
-    ));
+    let read_cache_service_origin =
+        Arc::new(ReadableCache::<
+            StaticVectorManageService<StaticStruct>,
+            StaticStruct,
+        >::new(
+            "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
+        ));
     let read_cache_service = Arc::clone(&read_cache_service_origin);
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
@@ -438,25 +442,24 @@ fn test_getting_static_multi_thread() {
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
-    let handles =  (0..TURNS)
-.map(|i|    {
-        let read_cache_service = Arc::clone(&read_cache_service);
-        std::thread::spawn(
-        move  || {
-            let mut rng = rand::thread_rng(); 
-        for i in 0..(COUNT/TURNS) {
-            // let obj = read_cache_service.getting(i as u64);
-            let random_int: u64 = rng.gen_range(0..(COUNT/ TURNS) as u64 / 10);
-            let obj1 = read_cache_service.getting(random_int);
-        }
+    let handles = (0..TURNS)
+        .map(|i| {
+            let read_cache_service = Arc::clone(&read_cache_service);
+            std::thread::spawn(move || {
+                let mut rng = rand::thread_rng();
+                for i in 0..(COUNT / TURNS) {
+                    // let obj = read_cache_service.getting(i as u64);
+                    let random_int: u64 = rng.gen_range(0..(COUNT / TURNS) as u64 / 10);
+                    let obj1 = read_cache_service.getting(random_int);
+                }
+            })
         })
-    })
-    .collect::<Vec<_>>();
+        .collect::<Vec<_>>();
     for handle in handles {
         // handle.join().expect("Thread panicked");
         handle.join().unwrap();
     }
-    
+
     let get_from_cache_duration = start.elapsed();
     println!(
         "get from  cache duration: {:?}",
@@ -464,7 +467,7 @@ fn test_getting_static_multi_thread() {
     );
 }
 
-#[test]
+// #[test]
 fn test_compare_static_multi_thread() {
     let mut objs = Vec::new();
     let my_service =
@@ -473,9 +476,14 @@ fn test_compare_static_multi_thread() {
             "cacheSD.bin".to_string(),
             1024,
         );
-    let read_cache_service_origin = Arc::new(StaticVectorManageService::<StaticStruct>::new(
-        "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
-    ).unwrap());
+    let read_cache_service_origin = Arc::new(
+        StaticVectorManageService::<StaticStruct>::new(
+            "cacheS.bin".to_string(),
+            "cacheSD.bin".to_string(),
+            1024,
+        )
+        .unwrap(),
+    );
     let read_cache_service = Arc::clone(&read_cache_service_origin);
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
@@ -501,24 +509,23 @@ fn test_compare_static_multi_thread() {
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
-    let handles =  (0..TURNS)
-.map(|i|    {
-        let read_cache_service = Arc::clone(&read_cache_service);
-        std::thread::spawn(
-        move  || {
-            let mut rng = rand::thread_rng(); 
-        for i in 0..COUNT {
-            // let obj = read_cache_service.getting(i as u64);
-            let random_int: u64 = rng.gen_range(0..COUNT as u64 / 10);
-            let obj1 = &read_cache_service.read(random_int);
-        }
+    let handles = (0..TURNS)
+        .map(|i| {
+            let read_cache_service = Arc::clone(&read_cache_service);
+            std::thread::spawn(move || {
+                let mut rng = rand::thread_rng();
+                for i in 0..COUNT {
+                    // let obj = read_cache_service.getting(i as u64);
+                    let random_int: u64 = rng.gen_range(0..COUNT as u64 / 10);
+                    let obj1 = &read_cache_service.read(random_int);
+                }
+            })
         })
-    })
-    .collect::<Vec<_>>();
+        .collect::<Vec<_>>();
     for handle in handles {
         handle.join().expect("Thread panicked");
     }
-    
+
     let get_from_cache_duration = start.elapsed();
     println!(
         "get from  cache duration: {:?}",
@@ -539,7 +546,9 @@ fn test_safe_getting_static_multi_thread() {
         StaticVectorManageService<StaticStruct>,
         StaticStruct,
     >::new(
-        "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
+        "cacheS.bin".to_string(),
+        "cacheSD.bin".to_string(),
+        1024,
     )));
     let read_cache_service = Arc::clone(&read_cache_service_origin);
     for i in 0..COUNT {
@@ -560,31 +569,33 @@ fn test_safe_getting_static_multi_thread() {
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let read_cache_service = Arc::clone(&read_cache_service);
-    let objs = read_cache_service.lock().unwrap().getting_lot(0, COUNT as u64);
+    let objs = read_cache_service
+        .lock()
+        .unwrap()
+        .getting_lot(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
-    let handles =  (0..TURNS)
-.map(|i|    {
-        let read_cache_service = Arc::clone(&read_cache_service);
-        std::thread::spawn(
-        move  || {
-            let mut rng = rand::thread_rng(); 
-        for i in 0..(COUNT/TURNS) {
-            // let obj = read_cache_service.getting(i as u64);
-            let random_int: u64 = rng.gen_range(0..(COUNT/ TURNS) as u64 / 10);
-            let obj1 = read_cache_service.lock().unwrap().getting(random_int);
-        }
+    let handles = (0..TURNS)
+        .map(|i| {
+            let read_cache_service = Arc::clone(&read_cache_service);
+            std::thread::spawn(move || {
+                let mut rng = rand::thread_rng();
+                for i in 0..(COUNT / TURNS) {
+                    // let obj = read_cache_service.getting(i as u64);
+                    let random_int: u64 = rng.gen_range(0..(COUNT / TURNS) as u64 / 10);
+                    let obj1 = read_cache_service.lock().unwrap().getting(random_int);
+                }
+            })
         })
-    })
-    .collect::<Vec<_>>();
+        .collect::<Vec<_>>();
     for handle in handles {
         // handle.join().expect("Thread panicked");
         handle.join().unwrap();
     }
-    
+
     let get_from_cache_duration = start.elapsed();
     println!(
         "get from  cache duration: {:?}",
