@@ -1,4 +1,4 @@
-use crate::{
+use crate::services::{
     dynamic_vector_manage_service::DynamicVectorManageService,
     static_vector_manage_service::StaticVectorManageService,
 };

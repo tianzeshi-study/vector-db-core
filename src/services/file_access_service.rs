@@ -100,9 +100,9 @@ impl FileAccessService {
 
         // length +=4;
         // 检查读取的范围是否超出当前文件大小
-        if length as u64 > *current_size {
-            // if offset + length as u64 > *current_size {
-            // dbg!(offset, length, current_size);
+            // dbg!(&offset, &length, &current_size);
+        // if length as u64 > *current_size {
+        if offset + length as u64 > *current_size {
             panic!("Exceeded the file size while reading");
         }
 

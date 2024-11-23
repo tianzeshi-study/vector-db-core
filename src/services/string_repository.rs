@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use crate::file_access_service::FileAccessService;
+use crate::services::file_access_service::FileAccessService;
 
 const END_OFFSET_SIZE: usize = std::mem::size_of::<u64>(); // 文件头保留的偏移量空间大小
 
@@ -68,7 +68,7 @@ impl StringRepository {
         // dbg!(&bytes_vector);
         // let current_offset;
         let current_offset = self.file_end_offset.lock().unwrap().clone();
-        dbg!(current_offset);
+        // dbg!(current_offset);
         self.file_access
             .write_in_file(END_OFFSET_SIZE as u64 + current_offset + 1, &bytes_vector);
         *self.file_end_offset.lock().unwrap() += bytes_vector.len() as u64;
@@ -88,7 +88,7 @@ impl StringRepository {
         // dbg!(&bytes_vector);
         let current_offset = {
             let mut current_offset = self.file_end_offset.lock().unwrap();
-            dbg!(&current_offset);
+            // dbg!(&current_offset);
             self.file_access.write_in_file(
                 END_OFFSET_SIZE as u64 + current_offset.clone() + 1,
                 &bytes_vector,
@@ -101,7 +101,7 @@ impl StringRepository {
 
             current_offset.clone()
         };
-        dbg!(&current_offset);
+        // dbg!(&current_offset);
 
         (current_offset - bytes_vector.len() as u64, current_offset)
     }
@@ -111,7 +111,7 @@ impl StringRepository {
     pub fn load_string_content(&self, offset: u64, length: u64) -> Vec<u8> {
         // let offset  = offset +END_OFFSET_SIZE as u64;
         let offset = offset + 1;
-        dbg!(&offset, &END_OFFSET_SIZE);
+        // dbg!(&offset, &END_OFFSET_SIZE);
         let string_bytes: Vec<u8> = self
             .file_access
             .read_in_file(END_OFFSET_SIZE as u64 + offset as u64, length as usize);

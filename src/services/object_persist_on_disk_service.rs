@@ -24,7 +24,7 @@ pub use dynamic_vector::{
     VectorCandidate,
 };
 
-use crate::{
+use crate::services::{
     file_access_service::FileAccessService,
     string_repository::StringRepository,
 };

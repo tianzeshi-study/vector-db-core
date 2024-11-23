@@ -16,7 +16,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{
+use crate::services::{
     file_access_service::FileAccessService,
     string_repository::StringRepository,
 };
@@ -246,7 +246,7 @@ where
         let start_offset = u64::from_le_bytes(start_offset_bytes.try_into().unwrap());
         let end_offset = u64::from_le_bytes(end_offset_bytes.try_into().unwrap());
         // dbg!(&start_offset, &end_offset);
-        let obj: T = self.load_dynamic(start_offset, end_offset);
+        let obj: T = self.load_dynamic(start_offset, end_offset -  start_offset);
 
         // let obj = objs[0].clone();
 

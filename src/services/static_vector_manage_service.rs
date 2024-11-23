@@ -21,7 +21,7 @@ use std::{
 // pub use dynamic_vector::DynamicVector;
 pub use dynamic_vector::VectorCandidate;
 
-use crate::{
+use crate::services::{
     file_access_service::FileAccessService,
     string_repository::StringRepository,
 };
