@@ -129,7 +129,7 @@ where
 
     pub fn getting_objs_from_cache(&self, index: u64, count: u64) -> Vec<T> {
         let end_offset = (index + count) as usize;
-        dbg!(index, count, end_offset);
+        // dbg!(index, count, end_offset);
         self.cache.lock().unwrap()[index as usize..end_offset].into()
     }
 

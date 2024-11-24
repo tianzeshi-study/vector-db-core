@@ -87,7 +87,8 @@ where
     }
 
     pub fn extend(&self, objs: Vec<T>) {
-        self.extend(objs);
+        // self.extend(objs);
+        self.writable_cache.extend(objs);
     }
 
     pub fn getting(&self, index: u64) -> T {
@@ -95,12 +96,12 @@ where
         let cache_count = self.writable_cache.get_cache_len() as u64;
         let base_count = self.writable_cache.get_base_len() as u64;
         let current_count = index + 1;
-        dbg!(total_count, cache_count, base_count);
+        // dbg!(total_count, cache_count, base_count);
         let obj = if current_count <= base_count {
-            println!("access ReadableCache");
+            // println!("access ReadableCache");
             self.readable_cache.getting(index)
         } else if current_count > base_count && index <= total_count {
-            println!("access WritableCache");
+            // println!("access WritableCache");
             let obj = self
                 .writable_cache
                 .getting_obj_from_cache(index - base_count);
@@ -144,14 +145,17 @@ where
         let base_count = self.writable_cache.get_base_len() as u64;
         let end_offset = index + count;
         let objs = if end_offset <= base_count {
+            println!("reading readable_cache");
             self.readable_cache.getting_lot(index, count)
-        } else if index > base_count && end_offset <= total_count {
+        } else if index >= base_count && end_offset <= total_count {
+            println!("reading Writable cache");
             let objs = self
                 .writable_cache
                 .getting_objs_from_cache(index - base_count, end_offset - base_count);
             self.readable_cache.add_bulk_to_cache(index, objs.clone());
             objs
-        } else if index <= base_count && end_offset <= total_count {
+        } else if index < base_count && end_offset <= total_count {
+            println!("reading readable cache and Writable Cache ");
             let mut front = self.readable_cache.getting_lot(index, base_count - index);
             let mut back = self
                 .writable_cache
@@ -279,8 +283,15 @@ mod tests {
         value: i32,
     }
 
+fn remove_file(path: &str) {
+// let path = path.to_string();
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_file(&path).expect("Unable to remove file");
+        }
+}
     #[test]
     fn test_new() {
+        remove_file("static_repo.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
             "static_repo.bin".to_string(),
             "dynamic_repo.bin".to_string(),
@@ -292,6 +303,7 @@ mod tests {
 
     #[test]
     fn test_push_and_len() {
+        remove_file("static_repo1.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
             "static_repo1.bin".to_string(),
             "dynamic_repo1.bin".to_string(),
@@ -306,6 +318,7 @@ mod tests {
 
     #[test]
     fn test_getting_one() {
+        remove_file("static_repo2.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
             "static_repo2.bin".to_string(),
             "dynamic_repo2.bin".to_string(),
@@ -317,13 +330,65 @@ mod tests {
 
         let retrieved = db.getting(0);
         assert_eq!(retrieved.value, 42);
+        assert_eq!(db.len(), 1);
     }
 
     #[test]
     fn test_get_lot() {
+        remove_file("static_repo3.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
             "static_repo3.bin".to_string(),
             "dynamic_repo3.bin".to_string(),
+            100,
+        );
+
+        let item1 = TestData { value: 42 };
+        let item2 = TestData { value: 84 };
+
+        db.push(item1.clone());
+        db.push(item2.clone());
+        let objs = db.getting_lot(0, 2);
+        assert_eq!(objs.len(), 2);
+        let items = db.get_lot(0, 2).unwrap();
+        dbg!(&items);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].value, 42);
+        assert_eq!(items[1].value, 84);
+    }
+    
+    #[test]
+    fn test_extend() {
+        remove_file("static_repo4.bin");
+remove_file("dynamic_repo4.bin");
+        let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
+            "static_repo4.bin".to_string(),
+            "dynamic_repo4.bin".to_string(),
+            100,
+        );
+let mut objs = Vec::new();
+        let item1 = TestData { value: 42 };
+        let item2 = TestData { value: 84 };
+        objs.push(item1);
+        objs.push(item2);
+        db.extend(objs);
+
+        let objs = db.getting_lot(0, 2);
+        assert_eq!(objs.len(), 2);
+        let items = db.get_lot(0, 2).unwrap();
+        dbg!(&items);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].value, 42);
+        assert_eq!(items[1].value, 84);
+        assert_eq!(db.len(), 2);
+    }
+    
+    #[test]
+    fn test_getting_lot() {
+        remove_file("static_repo5.bin");
+remove_file("dynamic_repo5.bin");
+        let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
+            "static_repo5.bin".to_string(),
+            "dynamic_repo5.bin".to_string(),
             100,
         );
 

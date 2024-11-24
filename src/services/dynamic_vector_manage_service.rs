@@ -344,7 +344,48 @@ mod test {
         my_vec2: Vec<usize>,
     }
 
+fn remove_file(path: &str) {
+
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_file(&path).expect("Unable to remove file");
+        }
+}
+
+fn _remove_dir_all(path: &str) {
+
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_dir_all(&path).expect("Unable to remove file");
+        }
+}
+
+#[test]
     fn test_save_one() {
+        remove_file("DynamicX.bin");
+        remove_file("StringDynamicX.bin");
+        let mut my_service = DynamicVectorManageService::<ExampleStruct>::new(
+            "DynamicX.bin".to_string(),
+            "StringDynamicX.bin".to_string(),
+            1024,
+        )
+        .unwrap();
+
+        let i = 0;
+        let vec_test = vec![i];
+        let my_obj = ExampleStruct {
+            id: i,
+            my_vec: vec_test.clone(),
+            my_vec1: vec_test.clone(),
+            my_vec2: vec_test.clone(),
+        };
+
+        println!("size of my obj: {}", size_of_val(&my_obj));
+
+        my_service.save(my_obj);
+    }
+    
+    fn save_one() {
+        remove_file("Dynamic0.bin");
+        remove_file("StringDynamic0.bin");
         let mut my_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic0.bin".to_string(),
             "StringDynamic0.bin".to_string(),
@@ -368,7 +409,7 @@ mod test {
 
     #[test]
     fn test_load_one() {
-        test_save_one();
+        save_one();
         let read_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic0.bin".to_string(),
             "StringDynamic0.bin".to_string(),
@@ -382,7 +423,38 @@ mod test {
         assert_eq!(length, 1);
     }
 
-    fn test_save_bulk() {
+#[test]
+fn test_save_bulk() {
+        remove_file("DynamicY.bin");
+remove_file("StringDynamic.Ybin");
+        // 创建服务实例
+        let write_service = DynamicVectorManageService::<ExampleStruct>::new(
+            "DynamicY.bin".to_string(),
+            "StringDynamicY.bin".to_string(),
+            1024,
+        )
+        .unwrap();
+        let mut objs_list = std::vec::Vec::new();
+        for i in 0..COUNT {
+            // let i = 1;
+            let vec_test = vec![i];
+            let my_obj = ExampleStruct {
+                id: i,
+                my_vec: vec_test.clone(),
+                my_vec1: vec_test.clone(),
+                my_vec2: vec_test.clone(),
+            };
+            objs_list.push(my_obj.clone());
+            // println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+        }
+        let start = Instant::now();
+        write_service.save_bulk(objs_list);
+        let save_bulk_duration = start.elapsed();
+        println!("save bulk    took: {:?}", save_bulk_duration);
+    }
+    fn save_bulk() {
+        remove_file("Dynamic.bin");
+remove_file("StringDynamic.bin");
         // 创建服务实例
         let write_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic.bin".to_string(),
@@ -411,7 +483,7 @@ mod test {
 
     #[test]
     fn test_load_bulk() {
-        test_save_bulk();
+        save_bulk();
         let read_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic.bin".to_string(),
             "StringDynamic.bin".to_string(),

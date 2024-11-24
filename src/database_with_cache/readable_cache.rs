@@ -282,7 +282,7 @@ mod test {
             my_service.getting(i as u64);
         }
     }
-
+    
     #[test]
     fn test_one_by_one_push_dynamic() {
         // let my_service = DynamicVectorManageService::<StaticStruct>::new(
@@ -292,6 +292,7 @@ mod test {
                 "cacheDD1.bin".to_string(),
                 1024,
             );
+
         for i in 0..COUNT {
             let my_obj: StaticStruct = StaticStruct {
                 my_usize: 443 + i,
@@ -304,7 +305,36 @@ mod test {
             // my_vec.push(i as u64 *1000);
 
             my_service.push(my_obj);
+            // objs.push(my_obj);
         }
+    // my_service.extend(objs);
+    }
+
+    #[test]
+    fn test_extend_dynamic_engine() {
+        // let my_service = DynamicVectorManageService::<StaticStruct>::new(
+        let my_service: DynamicVectorManageService<StaticStruct> =
+            VectorEngine::<StaticStruct>::new(
+                "cacheD1.bin".to_string(),
+                "cacheDD1.bin".to_string(),
+                1024,
+            );
+            let mut objs = Vec::new();
+        for i in 0..COUNT {
+            let my_obj: StaticStruct = StaticStruct {
+                my_usize: 443 + i,
+                my_u64: 53,
+                my_u32: 4399,
+                my_u16: 3306,
+                my_u8: 22,
+                my_boolean: true,
+            };
+            // my_vec.push(i as u64 *1000);
+
+            // my_service.push(my_obj);
+            objs.push(my_obj);
+        }
+    my_service.extend(objs);
     }
 
     #[test]
