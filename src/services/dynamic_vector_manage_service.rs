@@ -254,20 +254,20 @@ where
     }
 
     pub fn save_bulk(&self, objs: Vec<T>) {
-        let index_to_write = {
+        let (index_to_write, length) = {
             let count = objs.len();
             let mut length = self.length.lock().unwrap();
             let index = *length;
             *length += count as u64;
             self.save_length(*length);
-            index
+            (index, *length)
         };
         let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
             + LENGTH_MARKER_SIZE as u64;
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
         let save_dynamic_duration = start.elapsed();
-        println!("save dynamic content  took: {:?}", save_dynamic_duration);
+        println!("save {} dynamic objs  took: {:?}", start_offset_and_end_offset.len(),  save_dynamic_duration);
         let offset_buffer: Vec<u8> = start_offset_and_end_offset
             .par_iter()
             .map(|obj| {
@@ -292,6 +292,7 @@ where
             "write offsets took: {:?}",
             write_offsets_duration - collect_offsets_duration
         );
+        // self.save_length(length);
     }
 
     pub fn load_bulk(&self, index: u64, count: u64) -> Vec<T> {

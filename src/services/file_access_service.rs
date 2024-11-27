@@ -96,14 +96,15 @@ impl FileAccessService {
 
     // 从文件指定偏移量读取数据
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
-        let current_size = self.current_size.lock().unwrap(); // 获取当前大小的锁
+        // let current_size = self.current_size.lock().unwrap(); // 获取当前大小的锁
+        let current_size = &self.get_updated_current_file_size();
 
         // length +=4;
         // 检查读取的范围是否超出当前文件大小
         // dbg!(&offset, &length, &current_size);
         // if length as u64 > *current_size {
         if offset + length as u64 > *current_size {
-            panic!("Exceeded the file size while reading");
+            panic!("offset: {}  and length: {} exceeded the file size: {}  while reading", offset, &length, &current_size);
         }
 
         // 读取数据
@@ -120,6 +121,16 @@ impl FileAccessService {
         fs.read_exact(&mut buffer)
             .expect("Failed to read the expected length of data");
         buffer
+    }
+    
+    fn get_updated_current_file_size(&self) -> u64 {
+        let current_size = std::fs::metadata(&self.path)
+            .expect("Unable to get file metadata")
+            .len();
+            // *self.current_size.lock().unwrap() = current_size;
+            let mut size = self.current_size.lock().unwrap() ;
+            *size = current_size;
+            *size
     }
 }
 

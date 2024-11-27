@@ -106,6 +106,7 @@ where
                 .writable_cache
                 .getting_obj_from_cache(index - base_count);
             self.readable_cache.add_to_cache(index, obj.clone());
+
             obj
         } else {
             panic!(
@@ -139,11 +140,12 @@ where
         obj
     }
 
-    pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
+    pub fn getting_lot1(&self, index: u64, count: u64) -> Vec<T> {
         let total_count = self.len() as u64;
         let cache_count = self.writable_cache.get_cache_len() as u64;
         let base_count = self.writable_cache.get_base_len() as u64;
         let end_offset = index + count;
+        dbg!(&total_count, &cache_count, &base_count, &end_offset, &index);
         let objs = if end_offset <= base_count {
             println!("reading readable_cache");
             self.readable_cache.getting_lot(index, count)
@@ -151,7 +153,8 @@ where
             println!("reading Writable cache");
             let objs = self
                 .writable_cache
-                .getting_objs_from_cache(index - base_count, end_offset - base_count);
+                .getting_objs_from_cache(index - base_count, end_offset - index);
+                // .getting_objs_from_cache(index - base_count, end_offset - base_count);
             self.readable_cache.add_bulk_to_cache(index, objs.clone());
             objs
         } else if index < base_count && end_offset <= total_count {
@@ -166,7 +169,104 @@ where
             front.append(&mut back);
             front
         } else {
-            panic!("out of index!");
+            panic!(
+                "end offset  out of bounds: the total count  is {} but the en offset   is {} !",
+                total_count, end_offset
+            );
+        };
+        // self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
+        objs
+    }
+    
+    pub fn getting_lot2(&self, index: u64, count: u64) -> Vec<T> {
+        let total_count = self.len() as u64;
+        let cache_count = self.writable_cache.get_cache_len() as u64;
+        let base_count = self.writable_cache.get_base_len() as u64;
+        let end_offset = index + count;
+        dbg!(&total_count, &cache_count, &base_count, &end_offset, &index);
+        let objs = if end_offset <= base_count {
+            println!("reading readable_cache");
+            self.readable_cache.getting_lot(index, count)
+        } else if index >= base_count && end_offset <= total_count {
+            println!("reading Writable cache");
+            let objs = self
+                .writable_cache
+                .getting_objs_from_cache(index - base_count, end_offset - index);
+                // .getting_objs_from_cache(index - base_count, end_offset - base_count);
+            self.readable_cache.add_bulk_to_cache(index, objs.clone());
+            objs
+        } else if index < base_count && end_offset <= total_count {
+            println!("reading readable cache and Writable Cache ");
+            let mut front = self.readable_cache.getting_lot(index, base_count - index);
+            let mut back = self
+                .writable_cache
+                .getting_objs_from_cache(0, end_offset - base_count);
+            self.readable_cache
+                .add_bulk_to_cache(base_count, back.clone());
+
+            front.append(&mut back);
+            front
+        } else {
+            panic!(
+                "end offset  out of bounds: the total count  is {} but the en offset   is {} !",
+                total_count, end_offset
+            );
+        };
+        // self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
+        objs
+    }
+    
+    pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
+        // let total_count = self.len() as u64;
+        // let cache_count = self.writable_cache.get_cache_len() as u64;
+        // let base_count = self.writable_cache.get_base_len() as u64;
+        let (cache_count, base_count, total_count): (u64, u64, u64) = self.writable_cache.get_each_len();
+        let end_offset = index + count;
+        dbg!(&total_count, &cache_count, &base_count, &end_offset, &index);
+        // let objs = if end_offset <= base_count {
+        let objs = if end_offset <= self.writable_cache.get_base_len() as u64 && self.writable_cache.get_cache_len() as u64 == total_count - base_count{
+            println!("reading readable_cache");
+            self.readable_cache.getting_lot(index, count)
+        // } else if index >= base_count && end_offset <= total_count {
+        } else if index >= self.writable_cache.get_base_len() as u64 && end_offset <= total_count {
+            println!("reading Writable cache");
+            let objs = if let Some (objs) =   self
+                .writable_cache
+                .get_objs_from_cache(index - base_count, end_offset - index) {
+                    println!("got from cache successful!"); 
+                    objs
+                } else {
+                    println!(" got from cache failed !"); 
+                    self.readable_cache.getting_lot(index, count)
+                };
+
+            self.readable_cache.add_bulk_to_cache(index, objs.clone());
+            objs
+        } else if index < self.writable_cache.get_base_len()  as u64&& end_offset <= total_count {
+            println!("reading readable cache and Writable Cache ");
+            let objs = if let Some(mut back)  = self
+                .writable_cache
+                .get_objs_from_cache(0, end_offset - base_count) {
+            let mut front = self.readable_cache.getting_lot(index, base_count - index);
+            
+            self.readable_cache
+                .add_bulk_to_cache(base_count, back.clone());
+            front.append(&mut back);
+                front
+                } else {
+                    let objs =  self.readable_cache.getting_lot(index, count);
+                    self.readable_cache
+                .add_bulk_to_cache(index, objs.clone());
+                objs
+                };
+                objs
+        } else {
+            panic!(
+                "end offset  out of bounds: the total count  is {} but the en offset   is {} !",
+                total_count, end_offset
+            );
         };
         // self.readable_cache.add_bulk_to_cache(index, objs.clone());
 

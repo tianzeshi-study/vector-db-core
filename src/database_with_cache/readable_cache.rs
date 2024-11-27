@@ -109,6 +109,9 @@ where
             lru_list.push_back(index);
         });
     }
+    
+
+
 
     pub fn add_bulk_to_cache(&self, index: u64, objs: Vec<T>) {
         let mut cache_clone = Arc::clone(&self.cache);

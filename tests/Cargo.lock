@@ -669,6 +669,7 @@ dependencies = [
  "blake2",
  "chrono",
  "rand",
+ "rayon",
  "serde",
  "serial_test",
  "sha2",

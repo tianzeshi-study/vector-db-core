@@ -18,7 +18,7 @@ use std::{
 use crate::vector_engine::VectorEngine;
 
 const PAGE_SIZE: u64 = 5000;
-const MAX_CACHE_ITEMS: usize = 1024000;
+const MAX_CACHE_ITEMS: usize = 1000;
 
 pub struct WritableCache<D, T>
 where
@@ -117,9 +117,8 @@ where
     pub fn len(&self) -> usize {
         // dbg!(self.get_cache_len()  , self.get_base_len());
         let (cache_len, base_len) = (self.get_cache_len(), self.get_base_len());
-        // dbg!(&cache_len, &base_len);
         let length = cache_len + base_len;
-        // dbg!(&length);
+        // dbg!(&cache_len, &base_len, &length);
         length
     }
 
@@ -129,12 +128,30 @@ where
 
     pub fn getting_objs_from_cache(&self, index: u64, count: u64) -> Vec<T> {
         let end_offset = (index + count) as usize;
-        // dbg!(index, count, end_offset);
-        self.cache.lock().unwrap()[index as usize..end_offset].into()
+        dbg!(index, count, end_offset);
+        // self.cache.lock().unwrap()[index as usize..end_offset].into()
+        let cache = self.cache.lock().unwrap();
+        dbg!(cache.len());
+        cache[index as usize..end_offset].into()
+    }
+    
+    pub fn get_each_len(&self) -> (u64, u64, u64) {
+        // dbg!(self.get_cache_len()  , self.get_base_len());
+        let (cache_len, base_len) = (self.get_cache_len(), self.get_base_len());
+        let length = cache_len + base_len;
+        (cache_len as u64, base_len as u64, length as u64)
     }
 
     pub fn get_obj_from_cache(&self, index: u64) -> Option<T> {
         self.cache.lock().unwrap().get(index as usize).cloned()
+    }
+    
+    pub fn get_objs_from_cache(&self, index: u64, count: u64) -> Option<Vec<T>> {
+        let cache = self.cache.lock().unwrap();
+        let end_offset = (index + count) as usize;
+        dbg!(index, count, end_offset);
+        dbg!(cache.len());
+        cache.get(index as usize..end_offset).map(|slice| slice.to_vec())
     }
 }
 
@@ -200,16 +217,56 @@ where
     }
 
     fn pull(&self, index: u64) -> T {
-        let obj = self.database.lock().unwrap().pull(index);
+        let cache = self.cache.lock().unwrap();
+        let db = self.database.lock().unwrap();
+        if index < db.len() as u64{
+        let obj = db.pull(index);
+        return obj;
+        } else if  index >= db.len() as u64&& index < (db.len() + cache.len()) as u64 {
+if let Some(obj) = cache.get(index as usize- db.len()) {
+return obj.clone();
+}     else { 
+panic!("index {}  out of bounds! items in database and cache is {} and {} ", index, db.len(),cache.len() ); 
+}
 
-        obj
+    }     else { 
+panic!("index {}  out of bounds! items in database and cache is {} and {} ", index, db.len(),cache.len() ); 
+}
     }
 
     fn pullx(&self, index: u64, count: u64) -> Vec<T> {
-        let objs = self.database.lock().unwrap().pullx(index, count);
+        let db  = self.database.lock().unwrap();
+        let cache =  self.cache.lock().unwrap();
+        let end_index = index + count - 1;
+        if  end_index < db.len()  as u64{
+            println!("reading in database");
+            return db.pullx(index, count);
+        } else if index < db.len() as u64&& end_index < (db.len() + cache.len() ) as u64 {
+            println!("reading in database and cache");
+                let mut front = db.pullx(index, db.len() as u64- index);
+                let mut back = if let Some(objs ) = cache.get(0.. end_index as usize- db.len() ) {
+ objs.to_vec() 
+                } else{ 
+    panic!("get from cache failed ! cache len is {} , index is {} , end_index is {}, db len is {}", cache.len(), index, end_index, db.len());
+};
+front.append(&mut back);
+return front;
+            } else if index >= db.len() as u64&& end_index < (db.len() + cache.len() ) as u64 {
+                println!("reading in cache");
+            let  objs = if let Some(objs ) = cache.get(index as usize- db.len()  .. end_index as usize- db.len() + 1) {
+ objs.to_vec() 
+                } else{
+    panic!("get from cache failed ! cache len is {} , index is {} , end_index is {}, db len is {}", cache.len(), index, end_index, db.len());
+};
+return objs; 
+            } else {
+                panic!("index {}  out of bounds!  database len {},  cache len is {}, end_index is  {} ", index, db.len(),cache.len(), end_index ); 
+            }
 
-        objs
+
+
     }
+    
 }
 
 #[cfg(test)]

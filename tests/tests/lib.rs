@@ -7,3 +7,4 @@ mod static_performance_test;
 mod vector_macro_test;
 mod vector_performance_test;
 mod engine_performance_test;
+mod cache_engine_performance_test;
