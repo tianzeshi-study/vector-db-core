@@ -1,18 +1,6 @@
-use rayon::prelude::*;
 use serde::{
     Deserialize,
     Serialize,
-};
-use std::{
-    collections::{
-        HashMap,
-        LinkedList,
-    },
-    sync::{
-        Arc,
-        Mutex,
-    },
-    time::Instant,
 };
 
 use crate::{
@@ -25,8 +13,8 @@ pub use self::writable_cache::WritableCache;
 
 pub mod readable_cache;
 pub use self::readable_cache::ReadableCache;
-const PAGE_SIZE: u64 = 5000;
-const MAX_CACHE_ITEMS: usize = 1024000;
+
+
 
 pub struct DatabaseWithCache<D, T>
 where
@@ -41,7 +29,7 @@ where
 {
     writable_cache: WritableCache<D, T>,
     readable_cache: ReadableCache<D, T>,
-    origin_database: D,
+
 }
 
 impl<D, T> DatabaseWithCache<D, T>
@@ -71,11 +59,7 @@ where
                 dynamic_repository.clone(),
                 initial_size_if_not_exists.clone(),
             ),
-            origin_database: VectorEngine::new(
-                static_repository,
-                dynamic_repository,
-                initial_size_if_not_exists,
-            ),
+
         }
     }
     pub fn len(&self) -> usize {
@@ -93,7 +77,7 @@ where
 
     pub fn getting(&self, index: u64) -> T {
         let total_count = self.len() as u64;
-        let cache_count = self.writable_cache.get_cache_len() as u64;
+
         let base_count = self.writable_cache.get_base_len() as u64;
         let current_count = index + 1;
 
@@ -120,7 +104,7 @@ where
 
     pub fn get(&self, index: u64) -> Option<T> {
         let total_count = self.len() as u64;
-        let cache_count = self.writable_cache.get_cache_len() as u64;
+
         let base_count = self.writable_cache.get_base_len() as u64;
         let obj = if index <= base_count {
             Some(self.readable_cache.getting(index))
@@ -275,7 +259,7 @@ where
 
     pub fn get_lot(&self, index: u64, count: u64) -> Option<Vec<T>> {
         let total_count = self.len() as u64;
-        let cache_count = self.writable_cache.get_cache_len() as u64;
+
         let base_count = self.writable_cache.get_base_len() as u64;
         let end_offset = index + count;
         dbg!(index, base_count, end_offset);
@@ -336,11 +320,7 @@ where
                 dynamic_repository.clone(),
                 initial_size_if_not_exists.clone(),
             ),
-            origin_database: VectorEngine::new(
-                static_repository,
-                dynamic_repository,
-                initial_size_if_not_exists,
-            ),
+
         }
     }
     fn len(&self) -> usize {
@@ -372,10 +352,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::{
-        dynamic_vector_manage_service::DynamicVectorManageService,
-        static_vector_manage_service::StaticVectorManageService,
-    };
+    use crate::services::static_vector_manage_service::StaticVectorManageService;
 
 
     #[derive(Serialize, Deserialize, Debug, Clone)]

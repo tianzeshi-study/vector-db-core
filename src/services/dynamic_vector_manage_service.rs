@@ -252,7 +252,7 @@ where
     }
 
     pub fn save_bulk(&self, objs: Vec<T>) {
-        let (index_to_write, length) = {
+        let (index_to_write, _length) = {
             let count = objs.len();
             let mut length = self.length.lock().unwrap();
             let index = *length;
@@ -359,7 +359,7 @@ fn _remove_dir_all(path: &str) {
     fn test_save_one() {
         remove_file("DynamicX.bin");
         remove_file("StringDynamicX.bin");
-        let mut my_service = DynamicVectorManageService::<ExampleStruct>::new(
+        let my_service = DynamicVectorManageService::<ExampleStruct>::new(
             "DynamicX.bin".to_string(),
             "StringDynamicX.bin".to_string(),
             1024,
@@ -383,7 +383,7 @@ fn _remove_dir_all(path: &str) {
     fn save_one() {
         remove_file("Dynamic0.bin");
         remove_file("StringDynamic0.bin");
-        let mut my_service = DynamicVectorManageService::<ExampleStruct>::new(
+        let my_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic0.bin".to_string(),
             "StringDynamic0.bin".to_string(),
             1024,

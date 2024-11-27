@@ -128,7 +128,7 @@ mod test {
     #[test]
     fn test_write_dynamic_repository() {
 
-        let mut my_service =
+        let my_service =
             StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
         let bytes_vector: Vec<u8> = "hello, world".to_string().as_bytes().to_vec();
         let result = my_service.write_string_content_and_get_offset(bytes_vector);

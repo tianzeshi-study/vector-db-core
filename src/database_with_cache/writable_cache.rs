@@ -1,23 +1,15 @@
-use rayon::prelude::*;
 use serde::{
     Deserialize,
     Serialize,
 };
-use std::{
-    collections::{
-        HashMap,
-        LinkedList,
-    },
-    sync::{
+use std::sync::{
         Arc,
         Mutex,
-    },
-    time::Instant,
-};
+    };
 
 use crate::vector_engine::VectorEngine;
 
-const PAGE_SIZE: u64 = 5000;
+
 const MAX_CACHE_ITEMS: usize = 1000;
 
 pub struct WritableCache<D, T>
@@ -67,7 +59,7 @@ where
     pub fn push(&self, obj: T) {
         let mut cache = self.cache.lock().unwrap();
         cache.push(obj);
-        let cache_len = cache.len();
+
         let max_cache_items = self.max_cache_items;
         if cache.len() >= self.max_cache_items {
             
@@ -91,7 +83,7 @@ where
         let mut objs = objs;
         cache.append(&mut objs);
 
-        let cache_len = cache.len();
+
         
         if cache.len() >= self.max_cache_items {
             let cache_clone = Arc::clone(&self.cache);

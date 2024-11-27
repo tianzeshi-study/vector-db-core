@@ -12,7 +12,6 @@ use std::{
         Arc,
         Mutex,
     },
-    time::Instant,
 };
 
 use crate::{
@@ -37,7 +36,7 @@ where
     database: D,
     cache: Arc<Mutex<HashMap<u64, T>>>,
     lru_list: Arc<Mutex<LinkedList<u64>>>,
-    page_size: u64,
+
     max_cache_items: usize,
 }
 
@@ -65,7 +64,7 @@ where
             ),
             cache: Arc::new(Mutex::new(HashMap::new())),
             lru_list: Arc::new(Mutex::new(LinkedList::new())),
-            page_size: PAGE_SIZE,
+
             max_cache_items: MAX_CACHE_ITEMS,
         }
     }
@@ -114,8 +113,8 @@ where
 
 
     pub fn add_bulk_to_cache(&self, index: u64, objs: Vec<T>) {
-        let mut cache_clone = Arc::clone(&self.cache);
-        let mut lru_list_clone = Arc::clone(&self.lru_list);
+        let cache_clone = Arc::clone(&self.cache);
+        let lru_list_clone = Arc::clone(&self.lru_list);
         let objs_len = objs.len();
         let max_cache_items = self.max_cache_items;
         std::thread::spawn(move || {
@@ -164,7 +163,7 @@ where
 
     fn check_lru_list(&self, index: u64) {
         let lru_list_clone = Arc::clone(&self.lru_list);
-        let cache_clone = Arc::clone(&self.cache);
+
         std::thread::spawn(move || {
             let mut lru_list = lru_list_clone.lock().unwrap();
             const VERY_RECENT_PAGE_ACCESS_LIMIT: usize = 0x10;
@@ -173,9 +172,9 @@ where
                 lru_list.iter().rev().take(VERY_RECENT_PAGE_ACCESS_LIMIT);
 
             if !recent_access.any(|&x| x == index) {
-                let mut current = lru_list.front(); 
 
-                let mut index = 0;
+
+                let index = 0;
                 let mut cursor = lru_list.cursor_front_mut();
 
                 
@@ -247,6 +246,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
     use super::*;
     use crate::services::{
         dynamic_vector_manage_service::DynamicVectorManageService,
