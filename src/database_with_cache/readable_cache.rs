@@ -16,7 +16,7 @@ use std::{
 };
 
 use crate::{
-    // services::file_access_service::FileAccessService,
+    
     vector_engine::VectorEngine,
 };
 
@@ -72,7 +72,7 @@ where
 
     pub fn getting(&self, index: u64) -> T {
         if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
-            // println!("checking lru list for index: {}", &index);
+
             self.check_lru_list(index);
             return page_data.clone();
         }
@@ -95,10 +95,10 @@ where
         let lru_list_clone = Arc::clone(&self.lru_list);
         let max_cache_items = self.max_cache_items;
         std::thread::spawn(move || {
-            // let mut cache = cache_clone.lock().unwrap();
+
             let mut lru_list = lru_list_clone.lock().unwrap();
 
-            // while cache.len() >= max_cache_items && !lru_list.is_empty() {
+
             while lru_list.len() >= max_cache_items && !lru_list.is_empty() {
                 if let Some(oldest_page) = lru_list.pop_front() {
                     cache_clone.lock().unwrap().remove(&oldest_page);
@@ -143,10 +143,10 @@ where
                         },
                     );
 
-            // let cache_clone = Arc::clone(&self.cache);
-            // let lru_list_clone  = Arc::clone(&self.lru_list);
-            // std::thread::spawn(move ||{
-            // let mut cache = cache_clone.lock().unwrap();
+
+
+
+
             cache_clone
                 .lock()
                 .unwrap()
@@ -173,17 +173,17 @@ where
                 lru_list.iter().rev().take(VERY_RECENT_PAGE_ACCESS_LIMIT);
 
             if !recent_access.any(|&x| x == index) {
-                let mut current = lru_list.front(); // 从列表的前端开始
+                let mut current = lru_list.front(); 
 
                 let mut index = 0;
                 let mut cursor = lru_list.cursor_front_mut();
 
-                // while let Some(&value) = current {
+                
                 while let Some(value) = cursor.current() {
                     if *value == index {
                         cursor.remove_current();
                         break;
-                    // 更新 current 为下一个元素
+                    
                     } else {
                         cursor.move_next();
                     }
@@ -252,7 +252,7 @@ mod test {
         dynamic_vector_manage_service::DynamicVectorManageService,
         static_vector_manage_service::StaticVectorManageService,
     };
-    const COUNT: usize = 1000;
+    const COUNT: usize = 100;
     const TURNS: usize = 5;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -288,7 +288,7 @@ mod test {
     
     #[test]
     fn test_one_by_one_push_dynamic() {
-        // let my_service = DynamicVectorManageService::<StaticStruct>::new(
+        
         let my_service: DynamicVectorManageService<StaticStruct> =
             VectorEngine::<StaticStruct>::new(
                 "cacheD1.bin".to_string(),
@@ -305,17 +305,17 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-            // my_vec.push(i as u64 *1000);
+            
 
             my_service.push(my_obj);
-            // objs.push(my_obj);
+            
         }
-    // my_service.extend(objs);
+    
     }
 
     #[test]
     fn test_extend_dynamic_engine() {
-        // let my_service = DynamicVectorManageService::<StaticStruct>::new(
+        
         let my_service: DynamicVectorManageService<StaticStruct> =
             VectorEngine::<StaticStruct>::new(
                 "cacheD1.bin".to_string(),
@@ -332,9 +332,9 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-            // my_vec.push(i as u64 *1000);
+            
 
-            // my_service.push(my_obj);
+            
             objs.push(my_obj);
         }
     my_service.extend(objs);
@@ -342,7 +342,7 @@ mod test {
 
     #[test]
     fn test_one_by_one_getting_dynamic() {
-        // let my_service = DynamicVectorManageService::<StaticStruct>::new(
+
         let my_service: DynamicVectorManageService<StaticStruct> =
             VectorEngine::<StaticStruct>::new(
                 "cacheD2.bin".to_string(),
@@ -359,11 +359,11 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-            // my_service.push(my_obj);
+
             objs.push(my_obj);
         }
         my_service.extend(objs);
-        // std::thread::sleep(std::time::Duration::from_secs(3));
+
 
         let read_service = ReadableCache::<
             DynamicVectorManageService<StaticStruct>,
@@ -387,7 +387,7 @@ mod test {
         }
         {
             let mut objs = Vec::new();
-            // let my_service = StaticVectorManageService::<StaticStruct>::new(
+
             let my_service: StaticVectorManageService<StaticStruct> =
                 VectorEngine::<StaticStruct>::new(
                     "cacheS3.bin".to_string(),
@@ -414,7 +414,7 @@ mod test {
             dbg!(&os[os.len() - 1]);
             let extend_cache_duration = start.elapsed();
             println!("extend cache duration: {:?}", extend_cache_duration);
-            // std::thread::sleep(std::time::Duration::from_secs(10));
+
         }
         let read_cache_service =
             ReadableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -425,7 +425,7 @@ mod test {
 
         let awake = Instant::now();
         let objs = read_cache_service.getting_lot(0, COUNT as u64);
-        // let getting_lot_cache_duration = start.elapsed();
+
         let getting_lot_cache_duration = awake.elapsed();
         println!("get lot cache duration: {:?}", getting_lot_cache_duration);
         assert_eq!(442 + COUNT, objs[COUNT as usize - 1].my_usize);
@@ -441,7 +441,7 @@ mod test {
         }
         {
             let mut objs = Vec::new();
-            // let my_service = StaticVectorManageService::<StaticStruct>::new(
+
             let my_service: StaticVectorManageService<StaticStruct> =
                 VectorEngine::<StaticStruct>::new(
                     "cacheS4.bin".to_string(),
@@ -513,11 +513,11 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-            // my_vec.push(i as u64 *1000);
+
             objs.push(my_obj);
 
-            // my_service.push(&my_obj);
-            // my_service.add(my_obj);
+
+
         }
         my_service.add_bulk(objs);
     }

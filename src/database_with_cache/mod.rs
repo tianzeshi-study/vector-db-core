@@ -16,7 +16,7 @@ use std::{
 };
 
 use crate::{
-    // file_access_service::FileAccessService,
+
     vector_engine::VectorEngine,
 };
 
@@ -87,7 +87,7 @@ where
     }
 
     pub fn extend(&self, objs: Vec<T>) {
-        // self.extend(objs);
+
         self.writable_cache.extend(objs);
     }
 
@@ -96,12 +96,12 @@ where
         let cache_count = self.writable_cache.get_cache_len() as u64;
         let base_count = self.writable_cache.get_base_len() as u64;
         let current_count = index + 1;
-        // dbg!(total_count, cache_count, base_count);
+
         let obj = if current_count <= base_count {
-            // println!("access ReadableCache");
+
             self.readable_cache.getting(index)
         } else if current_count > base_count && index <= total_count {
-            // println!("access WritableCache");
+
             let obj = self
                 .writable_cache
                 .getting_obj_from_cache(index - base_count);
@@ -133,9 +133,9 @@ where
         } else {
             None
         };
-        // if let Some(ref o) = obj {
-        // self.readable_cache.add_to_cache(index, o.clone());
-        // }
+
+
+
 
         obj
     }
@@ -154,7 +154,7 @@ where
             let objs = self
                 .writable_cache
                 .getting_objs_from_cache(index - base_count, end_offset - index);
-                // .getting_objs_from_cache(index - base_count, end_offset - base_count);
+
             self.readable_cache.add_bulk_to_cache(index, objs.clone());
             objs
         } else if index < base_count && end_offset <= total_count {
@@ -174,7 +174,7 @@ where
                 total_count, end_offset
             );
         };
-        // self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
 
         objs
     }
@@ -193,7 +193,7 @@ where
             let objs = self
                 .writable_cache
                 .getting_objs_from_cache(index - base_count, end_offset - index);
-                // .getting_objs_from_cache(index - base_count, end_offset - base_count);
+
             self.readable_cache.add_bulk_to_cache(index, objs.clone());
             objs
         } else if index < base_count && end_offset <= total_count {
@@ -213,23 +213,23 @@ where
                 total_count, end_offset
             );
         };
-        // self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
 
         objs
     }
     
     pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
-        // let total_count = self.len() as u64;
-        // let cache_count = self.writable_cache.get_cache_len() as u64;
-        // let base_count = self.writable_cache.get_base_len() as u64;
+
+
+
         let (cache_count, base_count, total_count): (u64, u64, u64) = self.writable_cache.get_each_len();
         let end_offset = index + count;
         dbg!(&total_count, &cache_count, &base_count, &end_offset, &index);
-        // let objs = if end_offset <= base_count {
+
         let objs = if end_offset <= self.writable_cache.get_base_len() as u64 && self.writable_cache.get_cache_len() as u64 == total_count - base_count{
             println!("reading readable_cache");
             self.readable_cache.getting_lot(index, count)
-        // } else if index >= base_count && end_offset <= total_count {
+
         } else if index >= self.writable_cache.get_base_len() as u64 && end_offset <= total_count {
             println!("reading Writable cache");
             let objs = if let Some (objs) =   self
@@ -268,7 +268,7 @@ where
                 total_count, end_offset
             );
         };
-        // self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
 
         objs
     }
@@ -303,7 +303,7 @@ where
         } else {
             None
         };
-        // self.readable_cache.add_bulk_to_cache(index, objs.clone());
+
 
         objs
     }
@@ -368,7 +368,7 @@ where
     }
 }
 
-// Test the DatabaseWithCache functionality
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,14 +377,14 @@ mod tests {
         static_vector_manage_service::StaticVectorManageService,
     };
 
-    // Define a simple structure for testing
+
     #[derive(Serialize, Deserialize, Debug, Clone)]
     struct TestData {
         value: i32,
     }
 
 fn remove_file(path: &str) {
-// let path = path.to_string();
+
         if std::path::Path::new(&path).exists() {
             std::fs::remove_file(&path).expect("Unable to remove file");
         }

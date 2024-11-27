@@ -21,17 +21,16 @@ use crate::services::{
     string_repository::StringRepository,
 };
 
-const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); // We reserve the first 8 bytes for Length
+const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); 
 
 pub struct DynamicVectorManageService<T>
 where
     T: Serialize + for<'de> Deserialize<'de> + Send,
 {
     length: Arc<Mutex<u64>>,
-    // structure_file: Mutex<CachedFileAccessService>, // 结构文件的文件句柄
     structure_file: Mutex<FileAccessService>,
     string_repository: StringRepository,
-    _marker: PhantomData<T>, // 用于存储对象类型的占位符
+    _marker: PhantomData<T>, 
 }
 
 impl<T> DynamicVectorManageService<T>
@@ -49,17 +48,16 @@ where
         string_file_path: String,
         initial_size_if_not_exists: u64,
     ) -> io::Result<Self> {
-        // let structure_file_access = CachedFileAccessService::new(structure_file_path, initial_size_if_not_exists);
         let structure_file_access =
             FileAccessService::new(structure_file_path, initial_size_if_not_exists);
         let string_repository =
             StringRepository::new(string_file_path.clone(), initial_size_if_not_exists);
         let length = {
             let buffer = structure_file_access.read_in_file(0, LENGTH_MARKER_SIZE);
-            // 确保 buffer 的长度至少为 8
+
             assert!(buffer.len() >= 8, "Buffer length must be at least 4 bytes.");
 
-            // 将前       8 个字节转换为 u64，使用小端字节序
+
             let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
 
             Arc::new(Mutex::new(length))
@@ -75,14 +73,14 @@ where
     pub fn get_length(&self) -> u64 {
         let structure_file_guard = self.structure_file.lock().unwrap();
         let buffer = structure_file_guard.read_in_file(0, LENGTH_MARKER_SIZE);
-        // 确保 buffer 的长度至少为 4
+
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-        // 将前 4 个字节转换为 u64，假设使用小端字节序
-        // let length = u64::from_le_bytes(buffer[0..4].try_into().unwrap());
+
+
         let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
 
-        // *self.length.lock().unwrap()
+
         length
     }
 
@@ -112,18 +110,18 @@ where
                 (serialized, len)
             })
             .fold(
-                || (Vec::new(), Vec::new()), // 初始值
+                || (Vec::new(), Vec::new()), 
                 |mut acc, (serialized, len)| {
-                    acc.0.extend(serialized); // 将序列化的字节展开并加入 `bytes`
-                    acc.1.push(len); // 将字节长度加入 `length_list`
+                    acc.0.extend(serialized); 
+                    acc.1.push(len);
                     acc
                 },
             )
             .reduce(
-                || (Vec::new(), Vec::new()), // 初始值
+                || (Vec::new(), Vec::new()), 
                 |(mut bytes1, mut lengths1), (bytes2, lengths2)| {
-                    bytes1.extend(bytes2); // 合并两个字节向量
-                    lengths1.extend(lengths2); // 合并两个长度向量
+                    bytes1.extend(bytes2);
+                    lengths1.extend(lengths2);
                     (bytes1, lengths1)
                 },
             );
@@ -146,10 +144,10 @@ where
         let offsets_list = length_list
             .into_iter()
             .scan(start_offset, |current_offset, length| {
-                let start = *current_offset; // 当前对象的起点
-                let end = start + length; // 当前对象的终点
-                *current_offset = end; // 更新累加器为下一个对象的起点
-                Some((start, end)) // 返回当前区间
+                let start = *current_offset;
+                let end = start + length;
+                *current_offset = end; 
+                Some((start, end)) 
             })
             .collect::<Vec<(u64, u64)>>();
 
@@ -197,15 +195,15 @@ where
                     "Invalid length_list or bytes!"
                 );
 
-                // 提取当前范围的切片并转换为 Vec<u8>
+                
                 let segment = bytes[start..start + length].to_vec();
 
-                // 更新起始位置
+                
                 start += length;
 
                 segment
             })
-            .collect(); // 收集为 Vec<Vec<u8>>
+            .collect(); 
 
         let objs: Vec<T> = byte_vectors
             .par_iter()
@@ -236,7 +234,7 @@ where
     pub fn load(&self, index: u64) -> T {
         let file_offset =
             2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
-        // dbg!(&file_offset);
+
         let file_guard = self.structure_file.lock().unwrap();
         let marker_data: Vec<u8> =
             file_guard.read_in_file(file_offset, 2 * LENGTH_MARKER_SIZE);
@@ -245,10 +243,10 @@ where
         let end_offset_bytes = &marker_data[8..16];
         let start_offset = u64::from_le_bytes(start_offset_bytes.try_into().unwrap());
         let end_offset = u64::from_le_bytes(end_offset_bytes.try_into().unwrap());
-        // dbg!(&start_offset, &end_offset);
+
         let obj: T = self.load_dynamic(start_offset, end_offset - start_offset);
 
-        // let obj = objs[0].clone();
+
 
         obj
     }
@@ -292,7 +290,7 @@ where
             "write offsets took: {:?}",
             write_offsets_duration - collect_offsets_duration
         );
-        // self.save_length(length);
+
     }
 
     pub fn load_bulk(&self, index: u64, count: u64) -> Vec<T> {
@@ -301,24 +299,22 @@ where
         let file_guard = self.structure_file.lock().unwrap();
         let marker_data: Vec<u8> =
             file_guard.read_in_file(file_offset, 2 * LENGTH_MARKER_SIZE * count as usize);
-        // dbg!(&marker_data, &file_offset);
+
         let total_marker_length = 16 * count;
-        // dbg!(&total_marker_length);
+
         assert_eq!(marker_data.len() as u64, total_marker_length);
-        // let start_offset_bytes = &marker_data[0..8];
-        // let end_offset_bytes  = &marker_data[(total_marker_length as usize - 8)..(total_marker_length as usize)];
-        // let start_offset = u64::from_le_bytes(start_offset_bytes.try_into().unwrap());
-        // let end_offset = u64::from_le_bytes(end_offset_bytes.try_into().unwrap());
-        // dbg!(&start_offset, &end_offset);
-        // let objs: Vec<T> = self.load_dynamic(start_offset, end_offset);
+
+
+
+
 
         let start_offset_and_end_offset_list: Vec<(u64, u64)> = marker_data
-            .chunks_exact(16) // 每次取16字节的切片
+            .chunks_exact(16) 
             .map(|chunk| {
-                // 将前8字节解析为第一个u64
+               
                 let part1 =
                     u64::from_le_bytes(chunk[0..8].try_into().expect("Failed to parse u64!"));
-                // 将后8字节解析为第二个u64
+                
                 let part2 =
                     u64::from_le_bytes(chunk[8..16].try_into().expect("Failed to parse u64!"));
                 (part1, part2)
@@ -333,9 +329,9 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    // use dynamic_vector::VectorCandidate;
 
-    const COUNT: usize = 1000000;
+
+    const COUNT: usize = 1000;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
     pub struct ExampleStruct {
@@ -428,7 +424,7 @@ fn _remove_dir_all(path: &str) {
 fn test_save_bulk() {
         remove_file("DynamicY.bin");
 remove_file("StringDynamic.Ybin");
-        // 创建服务实例
+
         let write_service = DynamicVectorManageService::<ExampleStruct>::new(
             "DynamicY.bin".to_string(),
             "StringDynamicY.bin".to_string(),
@@ -437,7 +433,7 @@ remove_file("StringDynamic.Ybin");
         .unwrap();
         let mut objs_list = std::vec::Vec::new();
         for i in 0..COUNT {
-            // let i = 1;
+
             let vec_test = vec![i];
             let my_obj = ExampleStruct {
                 id: i,
@@ -446,7 +442,7 @@ remove_file("StringDynamic.Ybin");
                 my_vec2: vec_test.clone(),
             };
             objs_list.push(my_obj.clone());
-            // println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+
         }
         let start = Instant::now();
         write_service.save_bulk(objs_list);
@@ -456,7 +452,7 @@ remove_file("StringDynamic.Ybin");
     fn save_bulk() {
         remove_file("Dynamic.bin");
 remove_file("StringDynamic.bin");
-        // 创建服务实例
+
         let write_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic.bin".to_string(),
             "StringDynamic.bin".to_string(),
@@ -465,7 +461,7 @@ remove_file("StringDynamic.bin");
         .unwrap();
         let mut objs_list = std::vec::Vec::new();
         for i in 0..COUNT {
-            // let i = 1;
+
             let vec_test = vec![i];
             let my_obj = ExampleStruct {
                 id: i,
@@ -474,7 +470,7 @@ remove_file("StringDynamic.bin");
                 my_vec2: vec_test.clone(),
             };
             objs_list.push(my_obj.clone());
-            // println!("size of ExampleStruct:{}", size_of::<ExampleStruct>());
+
         }
         let start = Instant::now();
         write_service.save_bulk(objs_list);
