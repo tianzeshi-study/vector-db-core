@@ -8,23 +8,17 @@ use std::{
 
 use crate::services::file_access_service::FileAccessService;
 
-const END_OFFSET_SIZE: usize = std::mem::size_of::<u64>(); 
-
+const END_OFFSET_SIZE: usize = std::mem::size_of::<u64>();
 
 pub struct StringRepository {
     file_access: FileAccessService,
     file_end_offset: Arc<Mutex<u64>>,
-
 }
 
 impl StringRepository {
-
     pub fn new(string_file_path: String, initial_size_if_not_exists: u64) -> Self {
         let file_access =
             FileAccessService::new(string_file_path.clone(), initial_size_if_not_exists);
-
-
-
 
         let file_end_offset = {
             let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
@@ -35,21 +29,14 @@ impl StringRepository {
             Arc::new(Mutex::new(length))
         };
 
-
-
         Self {
             file_access,
             file_end_offset,
-
         }
     }
 
-
     fn _get_string_file_end_offset(file_access: &FileAccessService) -> u64 {
-
         let buffer = file_access.read_in_file(0, END_OFFSET_SIZE);
-
-
 
         let offset = u64::from_le_bytes(buffer.try_into().unwrap());
 
@@ -60,13 +47,10 @@ impl StringRepository {
         }
     }
 
-
     pub fn _write_string_content_and_get_offset(
         &mut self,
         bytes_vector: Vec<u8>,
     ) -> (u64, u64) {
-
-
         let current_offset = self.file_end_offset.lock().unwrap().clone();
 
         self.file_access
@@ -85,7 +69,6 @@ impl StringRepository {
         &self,
         bytes_vector: Vec<u8>,
     ) -> (u64, u64) {
-
         let current_offset = {
             let mut current_offset = self.file_end_offset.lock().unwrap();
 
@@ -102,20 +85,15 @@ impl StringRepository {
             current_offset.clone()
         };
 
-
         (current_offset - bytes_vector.len() as u64, current_offset)
     }
 
-
-
     pub fn load_string_content(&self, offset: u64, length: u64) -> Vec<u8> {
-
         let offset = offset + 1;
 
         let string_bytes: Vec<u8> = self
             .file_access
             .read_in_file(END_OFFSET_SIZE as u64 + offset as u64, length as usize);
-
 
         string_bytes
     }
@@ -127,7 +105,6 @@ mod test {
 
     #[test]
     fn test_write_dynamic_repository() {
-
         let my_service =
             StringRepository::new("test_dynamic_repository.bin".to_string(), 1024);
         let bytes_vector: Vec<u8> = "hello, world".to_string().as_bytes().to_vec();

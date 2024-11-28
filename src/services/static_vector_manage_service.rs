@@ -12,35 +12,23 @@ use std::{
     sync::{
         Arc,
         Mutex,
-        RwLock,
     },
-    time::Instant,
 };
-
-
 
 pub use dynamic_vector::VectorCandidate;
 
-use crate::services::{
-    file_access_service::FileAccessService,
-    string_repository::StringRepository,
-};
+use crate::services::file_access_service::FileAccessService;
 
-
-const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); 
-
-
+const LENGTH_MARKER_SIZE: usize = size_of::<u64>();
 
 pub struct StaticVectorManageService<T>
 where
     T: Serialize + for<'de> Deserialize<'de> + Send,
 {
     length: Arc<Mutex<u64>>,
-    structure_file: Mutex<FileAccessService>, 
-    
-    
-    initial_size_if_not_exists: u64,
-    _marker: PhantomData<T>, 
+    structure_file: Mutex<FileAccessService>,
+
+    _marker: PhantomData<T>,
 }
 
 impl<T: Send + Sync> StaticVectorManageService<T>
@@ -57,10 +45,9 @@ where
 
         let length = {
             let buffer = structure_file_access.read_in_file(0, LENGTH_MARKER_SIZE);
-            
+
             assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-            
             let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
 
             Arc::new(Mutex::new(length))
@@ -68,9 +55,7 @@ where
         Ok(Self {
             length,
             structure_file: Mutex::new(structure_file_access),
-            
 
-            initial_size_if_not_exists,
             _marker: PhantomData,
         })
     }
@@ -81,10 +66,7 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-
-
         let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
-
 
         length
     }
@@ -100,12 +82,6 @@ where
     }
 
     fn deserialize_object(data: &[u8]) -> T {
-
-
-
-
-
-
         bincode::deserialize(data).expect("Deserialization failed")
     }
 
@@ -127,12 +103,6 @@ where
         let count = objs.len();
         let mut buffer: Vec<u8> = vec![0; size_of_object * count];
 
-
-
-
-
-
-
         let serialized_objs: Vec<Vec<u8>> = objs
             .par_iter()
             .map(|obj| Self::serialize_object(obj))
@@ -140,11 +110,8 @@ where
 
         let mut current_position = 0;
         for serialized_obj in &serialized_objs {
-
-
             let serialized_size = serialized_obj.len();
             let white_space = size_of_object - serialized_size;
-
 
             buffer[current_position..current_position + serialized_size]
                 .copy_from_slice(&serialized_obj);
@@ -153,25 +120,10 @@ where
             current_position += serialized_size;
         }
 
-        let vec_data: Vec<Vec<u8>> = objs
-            .par_iter()
-            .map(|obj| Self::serialize_object(obj))
-            .collect::<Vec<Vec<u8>>>();
-
-
-
-
-
-
-
         let offset =
             (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
 
-
-
         let file_guard = self.structure_file.lock().unwrap();
-
-
 
         file_guard.write_in_file(offset, &buffer);
     }
@@ -182,11 +134,6 @@ where
         let mut buffer: Vec<u8> = vec![0; size_of_object * count];
         println!("length of buffer: {}", buffer.len());
 
-
-
-
-
-
         let serialized_objs: Vec<Vec<u8>> = objs
             .par_iter()
             .map(|obj| Self::serialize_object(obj))
@@ -194,12 +141,9 @@ where
 
         let mut current_position = 0;
         for serialized_obj in &serialized_objs {
-
-
             let serialized_size = serialized_obj.len();
             let white_space = size_of_object - serialized_size;
-            
-            
+
             buffer[current_position..current_position + serialized_size]
                 .copy_from_slice(&serialized_obj);
             current_position += white_space;
@@ -216,17 +160,12 @@ where
         println!("length of  item of vec_data:{}", vec_data[0].len());
         println!("bytes of vec_data:{}", vec_data[0].len() * vec_data.len());
 
-        
-        
         let offset =
             (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
         println!("bulk write offset: {}", offset);
-        
 
         let file_guard = self.structure_file.lock().unwrap();
-        
-        
-        
+
         file_guard.write_in_file_control(offset, &buffer).unwrap();
         Ok(())
     }
@@ -248,11 +187,11 @@ where
             let count = objs.len();
             let index = *length;
             *length += count as u64;
-            
+
             self.save_length(*length);
             index
         };
-        
+
         self.bulk_write_index(index_to_write.into(), objs);
     }
 
@@ -262,12 +201,13 @@ where
             let count = objs.len();
             let index = *length;
             *length += count as u64;
-            
+
             self.save_length(*length);
             index
         };
         println!("add bulk index_to_write:{}", index_to_write);
-        self.bulk_write_index_control(index_to_write.into(), objs);
+        self.bulk_write_index_control(index_to_write.into(), objs)
+            .unwrap();
         Ok(())
     }
 
@@ -275,18 +215,12 @@ where
         let size_of_object = size_of::<T>();
         let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
-        
-
         let length = size_of_object;
 
         let file_guard = self.structure_file.lock().unwrap();
         let data: Vec<u8> = file_guard.read_in_file(offset, length);
-        
-        
+
         let obj: T = bincode::deserialize(&data).expect("Deserialization failed");
-        
-
-
 
         obj
     }
@@ -297,10 +231,8 @@ where
 
         let length = count as usize * size_of_object;
 
-
         let file_guard = self.structure_file.lock().unwrap();
         let data: Vec<u8> = file_guard.read_in_file(offset, length);
-
 
         let objs: Vec<T> = data
             .par_chunks(size_of_object)
@@ -327,7 +259,7 @@ mod test {
     }
 
     #[test]
-    fn test_add_static_one() {
+    fn test_static_one() {
         let my_obj: StaticStruct = StaticStruct {
             my_usize: 443,
             my_u64: 53,
@@ -335,26 +267,23 @@ mod test {
             my_u16: 3306,
             my_u8: 22,
             my_boolean: true,
-
-
-
-
         };
         let my_service = StaticVectorManageService::<StaticStruct>::new(
-            "TestDynamicData.bin".to_string(),
-            "TestDynamicDataDynamic.bin".to_string(),
+            "TestStaticData1.bin".to_string(),
+            "TestStaticDataDynamic1.bin".to_string(),
             1024,
         )
         .unwrap();
         my_service.add(my_obj);
+        my_service.read(0);
     }
 
     #[test]
-    fn test_add_static_bulk() {
+    fn test_static_bulk() {
         let mut objs = Vec::new();
         let my_service = StaticVectorManageService::<StaticStruct>::new(
-            "TestDynamicData.bin".to_string(),
-            "TestDynamicDataDynamic.bin".to_string(),
+            "TestStaticData.bin".to_string(),
+            "TestStaticDataDynamic.bin".to_string(),
             1024,
         )
         .unwrap();
@@ -368,31 +297,9 @@ mod test {
                 my_boolean: true,
             };
 
-
             objs.push(my_obj.clone());
         }
         my_service.add_bulk(objs);
-    }
-
-    #[test]
-    fn test_read_static_one() {
-        let my_service = StaticVectorManageService::<StaticStruct>::new(
-            "TestDynamicData.bin".to_string(),
-            "TestDynamicDataDynamic.bin".to_string(),
-            1024,
-        )
-        .unwrap();
-        my_service.read(COUNT as u64);
-    }
-
-    #[test]
-    fn test_read_static_bulk() {
-        let my_service = StaticVectorManageService::<StaticStruct>::new(
-            "TestDynamicData.bin".to_string(),
-            "TestDynamicDataDynamic.bin".to_string(),
-            1024,
-        )
-        .unwrap();
         my_service.read_bulk(0, COUNT as u64);
     }
 }

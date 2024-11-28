@@ -21,7 +21,7 @@ use crate::services::{
     string_repository::StringRepository,
 };
 
-const LENGTH_MARKER_SIZE: usize = size_of::<u64>(); 
+const LENGTH_MARKER_SIZE: usize = size_of::<u64>();
 
 pub struct DynamicVectorManageService<T>
 where
@@ -30,7 +30,7 @@ where
     length: Arc<Mutex<u64>>,
     structure_file: Mutex<FileAccessService>,
     string_repository: StringRepository,
-    _marker: PhantomData<T>, 
+    _marker: PhantomData<T>,
 }
 
 impl<T> DynamicVectorManageService<T>
@@ -57,7 +57,6 @@ where
 
             assert!(buffer.len() >= 8, "Buffer length must be at least 4 bytes.");
 
-
             let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
 
             Arc::new(Mutex::new(length))
@@ -76,10 +75,7 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-
-
         let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
-
 
         length
     }
@@ -110,15 +106,15 @@ where
                 (serialized, len)
             })
             .fold(
-                || (Vec::new(), Vec::new()), 
+                || (Vec::new(), Vec::new()),
                 |mut acc, (serialized, len)| {
-                    acc.0.extend(serialized); 
+                    acc.0.extend(serialized);
                     acc.1.push(len);
                     acc
                 },
             )
             .reduce(
-                || (Vec::new(), Vec::new()), 
+                || (Vec::new(), Vec::new()),
                 |(mut bytes1, mut lengths1), (bytes2, lengths2)| {
                     bytes1.extend(bytes2);
                     lengths1.extend(lengths2);
@@ -137,7 +133,7 @@ where
             .write_string_content_and_get_offset(bytes);
         let write_vector_content_duration = start.elapsed();
         println!(
-            "save vector content  took: {:?}",
+            "persist vector content  on  dist took: {:?}",
             write_vector_content_duration - collect_length_list_duration
         );
 
@@ -146,8 +142,8 @@ where
             .scan(start_offset, |current_offset, length| {
                 let start = *current_offset;
                 let end = start + length;
-                *current_offset = end; 
-                Some((start, end)) 
+                *current_offset = end;
+                Some((start, end))
             })
             .collect::<Vec<(u64, u64)>>();
 
@@ -195,15 +191,13 @@ where
                     "Invalid length_list or bytes!"
                 );
 
-                
                 let segment = bytes[start..start + length].to_vec();
 
-                
                 start += length;
 
                 segment
             })
-            .collect(); 
+            .collect();
 
         let objs: Vec<T> = byte_vectors
             .par_iter()
@@ -246,9 +240,53 @@ where
 
         let obj: T = self.load_dynamic(start_offset, end_offset - start_offset);
 
-
-
         obj
+    }
+
+    pub fn _save_bulk1(&self, objs: Vec<T>) {
+        let (index_to_write, _length) = {
+            let count = objs.len();
+            let mut length = self.length.lock().unwrap();
+            let index = *length;
+            *length += count as u64;
+            self.save_length(*length);
+            (index, *length)
+        };
+        let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
+            + LENGTH_MARKER_SIZE as u64;
+        let start = Instant::now();
+        let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
+        let save_dynamic_duration = start.elapsed();
+        println!(
+            "save {} dynamic objs  total cost: {:?}",
+            start_offset_and_end_offset.len(),
+            save_dynamic_duration
+        );
+        let offset_buffer: Vec<u8> = start_offset_and_end_offset
+            .par_iter()
+            .map(|obj| {
+                let start_offset = obj.0;
+                let end_offset = obj.1;
+                let mut bytes_offset: Vec<u8> = start_offset.to_le_bytes().to_vec();
+                let mut bytes_total_length: Vec<u8> = end_offset.to_le_bytes().to_vec();
+                // bytes_offset.extend(bytes_total_length.iter());
+                bytes_offset.append(&mut bytes_total_length);
+                bytes_offset
+            })
+            .flatten()
+            .collect::<Vec<u8>>();
+        let collect_offsets_duration = start.elapsed();
+        println!(
+            "collect offsets bytes took: {:?}",
+            collect_offsets_duration - save_dynamic_duration
+        );
+        let file_guard = self.structure_file.lock().unwrap();
+        file_guard.write_in_file(file_offset, &offset_buffer);
+        let write_offsets_duration = start.elapsed();
+        println!(
+            "write offsets took: {:?}",
+            write_offsets_duration - collect_offsets_duration
+        );
     }
 
     pub fn save_bulk(&self, objs: Vec<T>) {
@@ -265,22 +303,23 @@ where
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
         let save_dynamic_duration = start.elapsed();
-        println!("save {} dynamic objs  took: {:?}", start_offset_and_end_offset.len(),  save_dynamic_duration);
+        println!(
+            "save {} dynamic objs  total cost: {:?}",
+            start_offset_and_end_offset.len(),
+            save_dynamic_duration
+        );
         let offset_buffer: Vec<u8> = start_offset_and_end_offset
-            .par_iter()
-            .map(|obj| {
-                let start_offset = obj.0;
-                let end_offset = obj.1;
-                let mut bytes_offset: Vec<u8> = start_offset.to_le_bytes().to_vec();
-                let bytes_total_length: Vec<u8> = end_offset.to_le_bytes().to_vec();
-                bytes_offset.extend(bytes_total_length.iter());
-                bytes_offset
+            .into_par_iter()
+            .flat_map(|(start_offset, end_offset)| {
+                let mut local_buffer = [0u8; 16];
+                local_buffer[..8].copy_from_slice(&start_offset.to_le_bytes());
+                local_buffer[8..].copy_from_slice(&end_offset.to_le_bytes());
+                local_buffer.to_vec()
             })
-            .flatten()
-            .collect::<Vec<u8>>();
+            .collect();
         let collect_offsets_duration = start.elapsed();
         println!(
-            "collect offsets took: {:?}",
+            "collect offsets bytes took: {:?}",
             collect_offsets_duration - save_dynamic_duration
         );
         let file_guard = self.structure_file.lock().unwrap();
@@ -290,7 +329,6 @@ where
             "write offsets took: {:?}",
             write_offsets_duration - collect_offsets_duration
         );
-
     }
 
     pub fn load_bulk(&self, index: u64, count: u64) -> Vec<T> {
@@ -304,19 +342,16 @@ where
 
         assert_eq!(marker_data.len() as u64, total_marker_length);
 
-
-
-
-
         let start_offset_and_end_offset_list: Vec<(u64, u64)> = marker_data
-            .chunks_exact(16) 
+            .chunks_exact(16)
             .map(|chunk| {
-               
-                let part1 =
-                    u64::from_le_bytes(chunk[0..8].try_into().expect("Failed to parse u64!"));
-                
-                let part2 =
-                    u64::from_le_bytes(chunk[8..16].try_into().expect("Failed to parse u64!"));
+                let part1 = u64::from_le_bytes(
+                    chunk[0..8].try_into().expect("Failed to parse u64!"),
+                );
+
+                let part2 = u64::from_le_bytes(
+                    chunk[8..16].try_into().expect("Failed to parse u64!"),
+                );
                 (part1, part2)
             })
             .collect();
@@ -330,7 +365,6 @@ where
 mod test {
     use super::*;
 
-
     const COUNT: usize = 1000;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -341,21 +375,19 @@ mod test {
         my_vec2: Vec<usize>,
     }
 
-fn remove_file(path: &str) {
-
+    fn remove_file(path: &str) {
         if std::path::Path::new(&path).exists() {
             std::fs::remove_file(&path).expect("Unable to remove file");
         }
-}
+    }
 
-fn _remove_dir_all(path: &str) {
-
+    fn _remove_dir_all(path: &str) {
         if std::path::Path::new(&path).exists() {
             std::fs::remove_dir_all(&path).expect("Unable to remove file");
         }
-}
+    }
 
-#[test]
+    #[test]
     fn test_save_one() {
         remove_file("DynamicX.bin");
         remove_file("StringDynamicX.bin");
@@ -379,7 +411,7 @@ fn _remove_dir_all(path: &str) {
 
         my_service.save(my_obj);
     }
-    
+
     fn save_one() {
         remove_file("Dynamic0.bin");
         remove_file("StringDynamic0.bin");
@@ -420,10 +452,10 @@ fn _remove_dir_all(path: &str) {
         assert_eq!(length, 1);
     }
 
-#[test]
-fn test_save_bulk() {
+    #[test]
+    fn test_save_bulk() {
         remove_file("DynamicY.bin");
-remove_file("StringDynamic.Ybin");
+        remove_file("StringDynamic.Ybin");
 
         let write_service = DynamicVectorManageService::<ExampleStruct>::new(
             "DynamicY.bin".to_string(),
@@ -433,7 +465,6 @@ remove_file("StringDynamic.Ybin");
         .unwrap();
         let mut objs_list = std::vec::Vec::new();
         for i in 0..COUNT {
-
             let vec_test = vec![i];
             let my_obj = ExampleStruct {
                 id: i,
@@ -442,7 +473,6 @@ remove_file("StringDynamic.Ybin");
                 my_vec2: vec_test.clone(),
             };
             objs_list.push(my_obj.clone());
-
         }
         let start = Instant::now();
         write_service.save_bulk(objs_list);
@@ -451,7 +481,7 @@ remove_file("StringDynamic.Ybin");
     }
     fn save_bulk() {
         remove_file("Dynamic.bin");
-remove_file("StringDynamic.bin");
+        remove_file("StringDynamic.bin");
 
         let write_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic.bin".to_string(),
@@ -461,7 +491,6 @@ remove_file("StringDynamic.bin");
         .unwrap();
         let mut objs_list = std::vec::Vec::new();
         for i in 0..COUNT {
-
             let vec_test = vec![i];
             let my_obj = ExampleStruct {
                 id: i,
@@ -470,7 +499,6 @@ remove_file("StringDynamic.bin");
                 my_vec2: vec_test.clone(),
             };
             objs_list.push(my_obj.clone());
-
         }
         let start = Instant::now();
         write_service.save_bulk(objs_list);

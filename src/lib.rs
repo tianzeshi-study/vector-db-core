@@ -1,8 +1,5 @@
 #![feature(linked_list_cursors)]
 
-
-
-
 mod database_with_cache;
 mod vector_engine;
 

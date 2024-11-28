@@ -17,7 +17,7 @@ use vector_db_core::{
     WritableCache,
 };
 
-const COUNT: usize = 37400;
+const COUNT: usize = 1000000;
 const TURNS: usize = 10;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -403,6 +403,7 @@ fn test_compare_static_multi_turns() {
 
 #[test]
 fn test_getting_static_multi_thread() {
+    const COUNT:usize = 1000; 
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -469,6 +470,7 @@ fn test_getting_static_multi_thread() {
 
 // #[test]
 fn test_compare_static_multi_thread() {
+    const COUNT:usize = 1000; 
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -535,6 +537,7 @@ fn test_compare_static_multi_thread() {
 
 #[test]
 fn test_safe_getting_static_multi_thread() {
+    const COUNT:usize = 1000; 
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(

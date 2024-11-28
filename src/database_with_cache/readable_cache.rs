@@ -14,12 +14,8 @@ use std::{
     },
 };
 
-use crate::{
-    
-    vector_engine::VectorEngine,
-};
+use crate::vector_engine::VectorEngine;
 
-const PAGE_SIZE: u64 = 5000;
 const MAX_CACHE_ITEMS: usize = 1024000;
 
 pub struct ReadableCache<D, T>
@@ -71,7 +67,6 @@ where
 
     pub fn getting(&self, index: u64) -> T {
         if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
-
             self.check_lru_list(index);
             return page_data.clone();
         }
@@ -94,9 +89,7 @@ where
         let lru_list_clone = Arc::clone(&self.lru_list);
         let max_cache_items = self.max_cache_items;
         std::thread::spawn(move || {
-
             let mut lru_list = lru_list_clone.lock().unwrap();
-
 
             while lru_list.len() >= max_cache_items && !lru_list.is_empty() {
                 if let Some(oldest_page) = lru_list.pop_front() {
@@ -108,9 +101,6 @@ where
             lru_list.push_back(index);
         });
     }
-    
-
-
 
     pub fn add_bulk_to_cache(&self, index: u64, objs: Vec<T>) {
         let cache_clone = Arc::clone(&self.cache);
@@ -142,10 +132,6 @@ where
                         },
                     );
 
-
-
-
-
             cache_clone
                 .lock()
                 .unwrap()
@@ -163,6 +149,7 @@ where
 
     fn check_lru_list(&self, index: u64) {
         let lru_list_clone = Arc::clone(&self.lru_list);
+        let cache_clone = Arc::clone(&self.cache);
 
         std::thread::spawn(move || {
             let mut lru_list = lru_list_clone.lock().unwrap();
@@ -172,20 +159,21 @@ where
                 lru_list.iter().rev().take(VERY_RECENT_PAGE_ACCESS_LIMIT);
 
             if !recent_access.any(|&x| x == index) {
-
-
                 let index = 0;
                 let mut cursor = lru_list.cursor_front_mut();
+                let mut index_to_remove: Option<u64> = None;
 
-                
                 while let Some(value) = cursor.current() {
                     if *value == index {
+                        index_to_remove = Some(*value);
                         cursor.remove_current();
                         break;
-                    
                     } else {
                         cursor.move_next();
                     }
+                }
+                if let Some(key_to_remove) = index_to_remove {
+                    cache_clone.lock().unwrap().remove(&key_to_remove);
                 }
                 lru_list.push_back(index);
             }
@@ -246,12 +234,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::time::Instant;
     use super::*;
     use crate::services::{
         dynamic_vector_manage_service::DynamicVectorManageService,
         static_vector_manage_service::StaticVectorManageService,
     };
+    use std::time::Instant;
     const COUNT: usize = 100;
     const TURNS: usize = 5;
 
@@ -274,21 +262,12 @@ mod test {
             "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
         );
         for i in 0..COUNT {
-            let my_obj: StaticStruct = StaticStruct {
-                my_usize: 443 + i,
-                my_u64: 53,
-                my_u32: 4399,
-                my_u16: 3306,
-                my_u8: 22,
-                my_boolean: true,
-            };
             my_service.getting(i as u64);
         }
     }
-    
+
     #[test]
     fn test_one_by_one_push_dynamic() {
-        
         let my_service: DynamicVectorManageService<StaticStruct> =
             VectorEngine::<StaticStruct>::new(
                 "cacheD1.bin".to_string(),
@@ -305,24 +284,20 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-            
 
             my_service.push(my_obj);
-            
         }
-    
     }
 
     #[test]
     fn test_extend_dynamic_engine() {
-        
         let my_service: DynamicVectorManageService<StaticStruct> =
             VectorEngine::<StaticStruct>::new(
                 "cacheD1.bin".to_string(),
                 "cacheDD1.bin".to_string(),
                 1024,
             );
-            let mut objs = Vec::new();
+        let mut objs = Vec::new();
         for i in 0..COUNT {
             let my_obj: StaticStruct = StaticStruct {
                 my_usize: 443 + i,
@@ -332,17 +307,14 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-            
 
-            
             objs.push(my_obj);
         }
-    my_service.extend(objs);
+        my_service.extend(objs);
     }
 
     #[test]
     fn test_one_by_one_getting_dynamic() {
-
         let my_service: DynamicVectorManageService<StaticStruct> =
             VectorEngine::<StaticStruct>::new(
                 "cacheD2.bin".to_string(),
@@ -363,7 +335,6 @@ mod test {
             objs.push(my_obj);
         }
         my_service.extend(objs);
-
 
         let read_service = ReadableCache::<
             DynamicVectorManageService<StaticStruct>,
@@ -414,7 +385,6 @@ mod test {
             dbg!(&os[os.len() - 1]);
             let extend_cache_duration = start.elapsed();
             println!("extend cache duration: {:?}", extend_cache_duration);
-
         }
         let read_cache_service =
             ReadableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -473,7 +443,7 @@ mod test {
                 1024,
             );
         let start = Instant::now();
-        for turn in 0..TURNS {
+        for _ in 0..TURNS {
             for i in 0..COUNT {
                 let obj = read_cache_service.getting(i as u64);
                 assert_eq!(443 + i, obj.my_usize);
@@ -515,9 +485,6 @@ mod test {
             };
 
             objs.push(my_obj);
-
-
-
         }
         my_service.add_bulk(objs);
     }

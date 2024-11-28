@@ -3,18 +3,13 @@ use serde::{
     Serialize,
 };
 
-use crate::{
-
-    vector_engine::VectorEngine,
-};
+use crate::vector_engine::VectorEngine;
 
 pub mod writable_cache;
 pub use self::writable_cache::WritableCache;
 
 pub mod readable_cache;
 pub use self::readable_cache::ReadableCache;
-
-
 
 pub struct DatabaseWithCache<D, T>
 where
@@ -29,7 +24,6 @@ where
 {
     writable_cache: WritableCache<D, T>,
     readable_cache: ReadableCache<D, T>,
-
 }
 
 impl<D, T> DatabaseWithCache<D, T>
@@ -59,7 +53,6 @@ where
                 dynamic_repository.clone(),
                 initial_size_if_not_exists.clone(),
             ),
-
         }
     }
     pub fn len(&self) -> usize {
@@ -71,7 +64,6 @@ where
     }
 
     pub fn extend(&self, objs: Vec<T>) {
-
         self.writable_cache.extend(objs);
     }
 
@@ -82,10 +74,8 @@ where
         let current_count = index + 1;
 
         let obj = if current_count <= base_count {
-
             self.readable_cache.getting(index)
         } else if current_count > base_count && index <= total_count {
-
             let obj = self
                 .writable_cache
                 .getting_obj_from_cache(index - base_count);
@@ -117,9 +107,6 @@ where
         } else {
             None
         };
-
-
-
 
         obj
     }
@@ -159,10 +146,9 @@ where
             );
         };
 
-
         objs
     }
-    
+
     pub fn getting_lot2(&self, index: u64, count: u64) -> Vec<T> {
         let total_count = self.len() as u64;
         let cache_count = self.writable_cache.get_cache_len() as u64;
@@ -198,61 +184,64 @@ where
             );
         };
 
-
         objs
     }
-    
+
     pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
-
-
-
-        let (cache_count, base_count, total_count): (u64, u64, u64) = self.writable_cache.get_each_len();
+        let (cache_count, base_count, total_count): (u64, u64, u64) =
+            self.writable_cache.get_each_len();
         let end_offset = index + count;
         dbg!(&total_count, &cache_count, &base_count, &end_offset, &index);
 
-        let objs = if end_offset <= self.writable_cache.get_base_len() as u64 && self.writable_cache.get_cache_len() as u64 == total_count - base_count{
+        let objs = if end_offset <= self.writable_cache.get_base_len() as u64
+            && self.writable_cache.get_cache_len() as u64 == total_count - base_count
+        {
             println!("reading readable_cache");
             self.readable_cache.getting_lot(index, count)
-
-        } else if index >= self.writable_cache.get_base_len() as u64 && end_offset <= total_count {
+        } else if index >= self.writable_cache.get_base_len() as u64
+            && end_offset <= total_count
+        {
             println!("reading Writable cache");
-            let objs = if let Some (objs) =   self
+            let objs = if let Some(objs) = self
                 .writable_cache
-                .get_objs_from_cache(index - base_count, end_offset - index) {
-                    println!("got from cache successful!"); 
-                    objs
-                } else {
-                    println!(" got from cache failed !"); 
-                    self.readable_cache.getting_lot(index, count)
-                };
+                .get_objs_from_cache(index - base_count, end_offset - index)
+            {
+                println!("got from cache successful!");
+                objs
+            } else {
+                println!(" got from cache failed !");
+                self.readable_cache.getting_lot(index, count)
+            };
 
             self.readable_cache.add_bulk_to_cache(index, objs.clone());
             objs
-        } else if index < self.writable_cache.get_base_len()  as u64&& end_offset <= total_count {
+        } else if index < self.writable_cache.get_base_len() as u64
+            && end_offset <= total_count
+        {
             println!("reading readable cache and Writable Cache ");
-            let objs = if let Some(mut back)  = self
+            let objs = if let Some(mut back) = self
                 .writable_cache
-                .get_objs_from_cache(0, end_offset - base_count) {
-            let mut front = self.readable_cache.getting_lot(index, base_count - index);
-            
-            self.readable_cache
-                .add_bulk_to_cache(base_count, back.clone());
-            front.append(&mut back);
+                .get_objs_from_cache(0, end_offset - base_count)
+            {
+                let mut front =
+                    self.readable_cache.getting_lot(index, base_count - index);
+
+                self.readable_cache
+                    .add_bulk_to_cache(base_count, back.clone());
+                front.append(&mut back);
                 front
-                } else {
-                    let objs =  self.readable_cache.getting_lot(index, count);
-                    self.readable_cache
-                .add_bulk_to_cache(index, objs.clone());
+            } else {
+                let objs = self.readable_cache.getting_lot(index, count);
+                self.readable_cache.add_bulk_to_cache(index, objs.clone());
                 objs
-                };
-                objs
+            };
+            objs
         } else {
             panic!(
                 "end offset  out of bounds: the total count  is {} but the en offset   is {} !",
                 total_count, end_offset
             );
         };
-
 
         objs
     }
@@ -288,7 +277,6 @@ where
             None
         };
 
-
         objs
     }
 }
@@ -320,7 +308,6 @@ where
                 dynamic_repository.clone(),
                 initial_size_if_not_exists.clone(),
             ),
-
         }
     }
     fn len(&self) -> usize {
@@ -348,24 +335,21 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::services::static_vector_manage_service::StaticVectorManageService;
-
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     struct TestData {
         value: i32,
     }
 
-fn remove_file(path: &str) {
-
+    fn remove_file(path: &str) {
         if std::path::Path::new(&path).exists() {
             std::fs::remove_file(&path).expect("Unable to remove file");
         }
-}
+    }
     #[test]
     fn test_new() {
         remove_file("static_repo.bin");
@@ -432,17 +416,17 @@ fn remove_file(path: &str) {
         assert_eq!(items[0].value, 42);
         assert_eq!(items[1].value, 84);
     }
-    
+
     #[test]
     fn test_extend() {
         remove_file("static_repo4.bin");
-remove_file("dynamic_repo4.bin");
+        remove_file("dynamic_repo4.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
             "static_repo4.bin".to_string(),
             "dynamic_repo4.bin".to_string(),
             100,
         );
-let mut objs = Vec::new();
+        let mut objs = Vec::new();
         let item1 = TestData { value: 42 };
         let item2 = TestData { value: 84 };
         objs.push(item1);
@@ -458,11 +442,11 @@ let mut objs = Vec::new();
         assert_eq!(items[1].value, 84);
         assert_eq!(db.len(), 2);
     }
-    
+
     #[test]
     fn test_getting_lot() {
         remove_file("static_repo5.bin");
-remove_file("dynamic_repo5.bin");
+        remove_file("dynamic_repo5.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
             "static_repo5.bin".to_string(),
             "dynamic_repo5.bin".to_string(),

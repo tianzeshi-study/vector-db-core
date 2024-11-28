@@ -1,3 +1,4 @@
+// Deprecated
 
 use rand::Rng;
 use serde::{

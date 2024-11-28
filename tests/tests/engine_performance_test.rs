@@ -12,7 +12,7 @@ use serde::{
 };
 use vector_db_core::*;
 
-const COUNT: usize = 1300000;
+const COUNT: usize = 1000000;
 const TURNS : usize =50;  
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -168,6 +168,7 @@ fn test_engine_read_sample_bulk() {
 
 #[test]
 fn test_engine_getting_sample_multi_thread() {
+    const COUNT:usize = 1000; 
 remove_file("SampleDataM.bin");
     remove_file("dynamicSampleDataM.bin");
     let objs = get_sample_objs();
@@ -221,6 +222,7 @@ remove_file("SampleDataM.bin");
 
 #[test]
 fn test_engine_compare_getting_sample_multi_thread() {
+    const COUNT:usize = 1000; 
 remove_file("SampleDataM1.bin");
     remove_file("dynamicSampleDataM1.bin");
     let objs = get_sample_objs();

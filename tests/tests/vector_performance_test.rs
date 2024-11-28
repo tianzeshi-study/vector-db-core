@@ -5,7 +5,7 @@ use serde::{
 use std::time::Instant;
 use vector_db_core::*;
 
-const COUNT: usize = 10000;
+const COUNT: usize = 1000000;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
 pub struct DynamicStruct {
@@ -21,8 +21,17 @@ pub struct DynamicStruct {
     my_string: String,
 }
 
+fn remove_file(path: &str) {
+// let path = path.to_string();
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_file(&path).expect("Unable to remove file");
+        }
+}
+
 #[test]
-fn test_save_one() {
+fn test_dynamic_vector_one() {
+    remove_file("vector.bin");
+    remove_file("StringDynamicvector.bin");
     let i = COUNT;
     let my_obj: DynamicStruct = DynamicStruct {
         my_usize: 443 + i,
@@ -43,27 +52,20 @@ fn test_save_one() {
     )
     .unwrap();
     my_service.save(my_obj);
-}
-
-#[test]
-fn test_load_one() {
-    test_save_one();
-    let my_service = DynamicVectorManageService::<DynamicStruct>::new(
-        "vector.bin".to_string(),
-        "StringDynamicvector.bin".to_string(),
-        1024,
-    )
-    .unwrap();
     my_service.load(0);
 }
 
+
+
 #[test]
-fn test_save_bulk() {
+fn test_dynamic_vector_bulk() {
+    remove_file("vector1.bin");
+    remove_file("StringDynamicvector1.bin");
     let mut my_vec = Vec::new();
     let mut objs = Vec::new();
     let mut my_service = DynamicVectorManageService::<DynamicStruct>::new(
-        "vector.bin".to_string(),
-        "StringDynamicvector.bin".to_string(),
+        "vector1.bin".to_string(),
+        "StringDynamicvector1.bin".to_string(),
         1024,
     )
     .unwrap();
@@ -88,17 +90,6 @@ fn test_save_bulk() {
     my_service.save_bulk(objs);
     let duration = start.elapsed(); // 计算时间差
     println!("add  {} items   took: {:?}", COUNT, duration);
-}
-
-#[test]
-fn test_load_bulk() {
-    test_save_bulk();
-    let my_service = DynamicVectorManageService::<DynamicStruct>::new(
-        "vector.bin".to_string(),
-        "StringDynamicvector.bin".to_string(),
-        1024,
-    )
-    .unwrap();
     let start = Instant::now(); // 记录开始时间
     my_service.load_bulk(0, COUNT as u64);
     let duration = start.elapsed(); // 计算时间差
