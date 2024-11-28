@@ -111,7 +111,7 @@ fn test_engine_sample_one_by_one() {
     let duration = start.elapsed(); 
     println!("one by one save  {} items   took: {:?}", COUNT, duration);
     assert_eq!(COUNT, my_service.len());
-    let objs = my_service.pullx(0, COUNT/100 as u64);
+    let objs = my_service.pullx(0, COUNT as u64 /100);
 }
 
 #[test]
