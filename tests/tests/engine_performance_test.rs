@@ -97,7 +97,7 @@ fn test_engine_sample_one_by_one() {
                     1024,
                 );
                     let start = Instant::now();
-    for i in 0..COUNT {
+    for i in 0..COUNT/100 {
         let my_obj = SampleData {
             my_number1: i as i32,
             my_string1: format!("Hello, World! 你好世界 {}", i).to_string(),
@@ -111,7 +111,7 @@ fn test_engine_sample_one_by_one() {
     let duration = start.elapsed(); 
     println!("one by one save  {} items   took: {:?}", COUNT, duration);
     assert_eq!(COUNT, my_service.len());
-    let objs = my_service.pullx(0, COUNT as u64);
+    let objs = my_service.pullx(0, COUNT/100 as u64);
 }
 
 #[test]

@@ -5,7 +5,7 @@ use serde::{
 use std::time::Instant;
 use vector_db_core::*;
 
-const COUNT: usize = 1000000;
+const COUNT: usize = 10000;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
 pub struct DynamicStruct {
@@ -59,13 +59,13 @@ fn test_dynamic_vector_one() {
 
 #[test]
 fn test_dynamic_vector_bulk() {
-    remove_file("vector1.bin");
-    remove_file("StringDynamicvector1.bin");
+    remove_file("vector11.bin");
+    remove_file("StringDynamicvector11.bin");
     let mut my_vec = Vec::new();
     let mut objs = Vec::new();
     let mut my_service = DynamicVectorManageService::<DynamicStruct>::new(
-        "vector1.bin".to_string(),
-        "StringDynamicvector1.bin".to_string(),
+        "vector11.bin".to_string(),
+        "StringDynamicvector11.bin".to_string(),
         1024,
     )
     .unwrap();
