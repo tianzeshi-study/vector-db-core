@@ -55,21 +55,7 @@ where
         }
     }
 
-    pub fn _push1(&self, obj: T) {
-        let mut cache = self.cache.lock().unwrap();
-        cache.push(obj);
 
-        let max_cache_items = self.max_cache_items;
-        if cache.len() >= self.max_cache_items {
-            let cache_clone = Arc::clone(&self.cache);
-            let database_clone = Arc::clone(&self.database);
-            std::thread::spawn(move || {
-                let mut objs = Vec::with_capacity(max_cache_items);
-                objs.append(&mut *cache_clone.lock().unwrap());
-                database_clone.lock().unwrap().extend(objs);
-            });
-        }
-    }
 
     pub fn push(&self, obj: T) {
         let mut cache = self.cache.lock().unwrap();
@@ -92,22 +78,7 @@ where
         });
     }
 
-    pub fn _extend1(&self, objs: Vec<T>) {
-        let mut cache = self.cache.lock().unwrap();
-        let mut objs = objs;
-        cache.append(&mut objs);
 
-        if cache.len() >= self.max_cache_items {
-            let cache_clone = Arc::clone(&self.cache);
-            let database_clone = Arc::clone(&self.database);
-            let max_cache_items = self.max_cache_items;
-            std::thread::spawn(move || {
-                let mut objs = Vec::with_capacity(max_cache_items);
-                objs.append(&mut *cache_clone.lock().unwrap());
-                database_clone.lock().unwrap().extend(objs);
-            });
-        }
-    }
 
     pub fn extend(&self, objs: Vec<T>) {
         let mut cache = self.cache.lock().unwrap();

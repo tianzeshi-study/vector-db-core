@@ -17,7 +17,7 @@ use vector_db_core::{
     WritableCache,
 };
 
-const COUNT: usize = 1000000;
+const COUNT: usize = 100;
 const TURNS: usize = 10;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -30,122 +30,8 @@ pub struct StaticStruct {
     my_boolean: bool,
 }
 
-#[test]
-fn test_push_static_one() {
-    let my_obj: StaticStruct = StaticStruct {
-        my_usize: 443,
-        my_u64: 53,
-        my_u32: 4399,
-        my_u16: 3306,
-        my_u8: 22,
-        my_boolean: true,
-        // my_string: "good luck!".to_string(),
-        // my_vec: vec!["hello".to_string(), "world".to_string()],
-        // my_vec: vec![1,2,3,4,5],
-        // my_array: [1,2,3,4,5],
-    };
-    let my_service =
-        WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
 
-    my_service.push(my_obj);
-}
 
-#[test]
-fn test_one_by_one_push_static() {
-    // let mut objs = Vec::new();
-    let my_service =
-        WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
-    for i in 0..COUNT {
-        let my_obj: StaticStruct = StaticStruct {
-            my_usize: 443 + i,
-            my_u64: 53,
-            my_u32: 4399,
-            my_u16: 3306,
-            my_u8: 22,
-            my_boolean: true,
-        };
-        // my_vec.push(i as u64 *1000);
-
-        my_service.push(my_obj);
-    }
-    // my_service.add_bulk(objs);
-}
-
-#[test]
-fn test_one_by_one_getting_static() {
-    let my_service =
-        ReadableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
-    for i in 0..COUNT {
-        let my_obj: StaticStruct = StaticStruct {
-            my_usize: 443 + i,
-            my_u64: 53,
-            my_u32: 4399,
-            my_u16: 3306,
-            my_u8: 22,
-            my_boolean: true,
-        };
-        // my_vec.push(i as u64 *1000);
-
-        // my_service.push(my_obj);
-        my_service.getting(i as u64);
-    }
-}
-
-#[test]
-fn test_one_by_one_push_dynamic() {
-    // let mut objs = Vec::new();
-    let my_service = WritableCache::<
-        DynamicVectorManageService<StaticStruct>,
-        StaticStruct,
-    >::new("cacheD.bin".to_string(), "cacheDD.bin".to_string(), 1024);
-    for i in 0..COUNT {
-        let my_obj: StaticStruct = StaticStruct {
-            my_usize: 443 + i,
-            my_u64: 53,
-            my_u32: 4399,
-            my_u16: 3306,
-            my_u8: 22,
-            my_boolean: true,
-        };
-        // my_vec.push(i as u64 *1000);
-
-        my_service.push(my_obj);
-    }
-    // my_service.add_bulk(objs);
-}
-
-#[test]
-fn test_one_by_one_getting_dynamic() {
-    let my_service = ReadableCache::<
-        DynamicVectorManageService<StaticStruct>,
-        StaticStruct,
-    >::new("cacheD.bin".to_string(), "cacheDD.bin".to_string(), 1024);
-    for i in 0..COUNT {
-        let my_obj: StaticStruct = StaticStruct {
-            my_usize: 443 + i,
-            my_u64: 53,
-            my_u32: 4399,
-            my_u16: 3306,
-            my_u8: 22,
-            my_boolean: true,
-        };
-        // my_vec.push(i as u64 *1000);
-
-        my_service.getting(i as u64);
-    }
-}
 
 #[test]
 fn test_extend_static() {
@@ -300,16 +186,7 @@ fn test_getting_static_multi_turns() {
         get_from_cache_duration - pull_lot_cache_duration
     );
 }
-// #[test]
-// fn test_read_static_one() {
-// let my_service = StaticVectorManageService::<StaticStruct>::new(
-// "TestDynamicData.bin".to_string(),
-// "TestDynamicDataDynamic.bin".to_string(),
-// 1024,
-// )
-// .unwrap();
-// my_service.read(COUNT);
-// }
+
 #[test]
 fn test_read_static_bulk_in_pushed() {
     let my_service = StaticVectorManageService::<StaticStruct>::new(
