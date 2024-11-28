@@ -21,7 +21,7 @@ jobs:
         with:
           toolchain: nightly  # 使用 nightly 版本
           components: rustfmt, clippy  # 可选：添加常用组件
-          profile: minimal
+
 
       # 缓存 Cargo 依赖项，提高运行速度
       - name: Cache Cargo dependencies
