@@ -13,19 +13,19 @@ jobs:
     steps:
       # 检出代码库
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 更新到最新版本的 checkout action
 
       # 设置 Rust 环境为 nightly 版本
       - name: Set up Rust (nightly)
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable  # 推荐使用最新的 rust-toolchain
         with:
           toolchain: nightly  # 使用 nightly 版本
-          profile: minimal    # 安装最小的工具链
-          override: true      # 覆盖项目默认 Rust 版本
+          components: rustfmt, clippy  # 可选：添加常用组件
+          profile: minimal
 
       # 缓存 Cargo 依赖项，提高运行速度
       - name: Cache Cargo dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4  # 使用最新版本的 cache action
         with:
           path: |
             ~/.cargo/registry
@@ -45,4 +45,4 @@ jobs:
 
       # 运行集成测试（tests 文件夹中的所有测试）
       - name: Run Integration Tests
-        run: cargo test --test '*' --verbose  # 运行 tests 文件夹中的所有集成测试
+        run: cd tests && cargo test --test '*' --verbose  
