@@ -215,8 +215,8 @@ where
         self.database.push(obj);
     }
 
-    fn extend(&self, objs: Vec<T>) {
-        self.database.extend(objs);
+    fn pushx(&self, objs: Vec<T>) {
+        self.database.pushx(objs);
     }
 
     fn pull(&self, index: u64) -> T {
@@ -310,7 +310,7 @@ mod test {
 
             objs.push(my_obj);
         }
-        my_service.extend(objs);
+        my_service.pushx(objs);
     }
 
     #[test]
@@ -334,7 +334,7 @@ mod test {
 
             objs.push(my_obj);
         }
-        my_service.extend(objs);
+        my_service.pushx(objs);
 
         let read_service = ReadableCache::<
             DynamicVectorManageService<StaticStruct>,
@@ -379,7 +379,7 @@ mod test {
             }
 
             let start = Instant::now();
-            my_service.extend(objs);
+            my_service.pushx(objs);
             dbg!(my_service.len());
             let os = my_service.pullx(0, COUNT as u64);
             dbg!(&os[os.len() - 1]);
@@ -432,7 +432,7 @@ mod test {
                 objs.push(my_obj);
             }
             let start = Instant::now();
-            my_service.extend(objs);
+            my_service.pushx(objs);
             let extend_cache_duration = start.elapsed();
             println!("extend cache duration: {:?}", extend_cache_duration);
         }

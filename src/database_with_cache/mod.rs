@@ -1,4 +1,4 @@
-//  Deprecated DatabaseWithCache, multiservice   is on going 
+//  Deprecated DatabaseWithCache, multiservice   is on going
 use serde::{
     Deserialize,
     Serialize,
@@ -64,8 +64,8 @@ where
         self.writable_cache.push(obj);
     }
 
-    pub fn extend(&self, objs: Vec<T>) {
-        self.writable_cache.extend(objs);
+    pub fn pushx(&self, objs: Vec<T>) {
+        self.writable_cache.pushx(objs);
     }
 
     pub fn getting(&self, index: u64) -> T {
@@ -319,8 +319,8 @@ where
         self.writable_cache.push(obj);
     }
 
-    fn extend(&self, objs: Vec<T>) {
-        self.extend(objs);
+    fn pushx(&self, objs: Vec<T>) {
+        self.pushx(objs);
     }
 
     fn pull(&self, index: u64) -> T {
@@ -419,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extend() {
+    fn test_pushx() {
         remove_file("static_repo4.bin");
         remove_file("dynamic_repo4.bin");
         let db = DatabaseWithCache::<StaticVectorManageService<TestData>, TestData>::new(
@@ -432,7 +432,7 @@ mod tests {
         let item2 = TestData { value: 84 };
         objs.push(item1);
         objs.push(item2);
-        db.extend(objs);
+        db.pushx(objs);
 
         let objs = db.getting_lot(0, 2);
         assert_eq!(objs.len(), 2);

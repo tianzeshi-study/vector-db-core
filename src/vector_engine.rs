@@ -23,7 +23,7 @@ where
         initial_file_size: u64,
     ) -> Self;
     fn push(&self, obj: T);
-    fn extend(&self, objs: Vec<T>);
+    fn pushx(&self, objs: Vec<T>);
     fn pull(&self, index: u64) -> T;
     fn pullx(&self, index: u64, count: u64) -> Vec<T>;
     fn len(&self) -> usize;
@@ -56,7 +56,7 @@ where
     fn push(&self, obj: T) {
         self.save(obj);
     }
-    fn extend(&self, objs: Vec<T>) {
+    fn pushx(&self, objs: Vec<T>) {
         self.save_bulk(objs);
     }
 
@@ -98,7 +98,7 @@ where
     fn push(&self, obj: T) {
         self.add(obj);
     }
-    fn extend(&self, objs: Vec<T>) {
+    fn pushx(&self, objs: Vec<T>) {
         self.add_bulk(objs);
     }
 

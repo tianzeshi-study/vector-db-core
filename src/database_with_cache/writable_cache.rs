@@ -55,8 +55,6 @@ where
         }
     }
 
-
-
     pub fn push(&self, obj: T) {
         let mut cache = self.cache.lock().unwrap();
         cache.push(obj);
@@ -73,14 +71,12 @@ where
                 objs.append(&mut *cache);
             }
             if objs.len() != 0 {
-                database_clone.lock().unwrap().extend(objs);
+                database_clone.lock().unwrap().pushx(objs);
             }
         });
     }
 
-
-
-    pub fn extend(&self, objs: Vec<T>) {
+    pub fn pushx(&self, objs: Vec<T>) {
         let mut cache = self.cache.lock().unwrap();
         let mut objs = objs;
         cache.append(&mut objs);
@@ -95,7 +91,7 @@ where
                 objs.append(&mut *cache);
             }
             if objs.len() != 0 {
-                database_clone.lock().unwrap().extend(objs);
+                database_clone.lock().unwrap().pushx(objs);
             }
         });
     }
@@ -169,7 +165,7 @@ where
 
             let mut objs = Vec::with_capacity(max_cache_items);
             objs.append(&mut *cache);
-            self.database.lock().unwrap().extend(objs);
+            self.database.lock().unwrap().pushx(objs);
         }
     }
 }
@@ -204,8 +200,8 @@ where
         self.push(obj);
     }
 
-    fn extend(&self, objs: Vec<T>) {
-        self.extend(objs);
+    fn pushx(&self, objs: Vec<T>) {
+        self.pushx(objs);
     }
 
     fn pull(&self, index: u64) -> T {
@@ -376,6 +372,6 @@ mod test {
 
             objs.push(my_obj);
         }
-        my_service.extend(objs);
+        my_service.pushx(objs);
     }
 }

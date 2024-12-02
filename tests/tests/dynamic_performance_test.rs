@@ -21,8 +21,17 @@ pub struct DynamicStruct {
     my_32_vec: Vec<u32>,
 }
 
+fn remove_file(path: &str) {
+// let path = path.to_string();
+        if std::path::Path::new(&path).exists() {
+            std::fs::remove_file(&path).expect("Unable to remove file");
+        }
+}
+
 #[test]
 fn test_dynamic_add_one() {
+    remove_file("data0.bin");
+    remove_file("StringDynamicData0.bin");
     let i = COUNT;
     let my_obj: DynamicStruct = DynamicStruct {
         my_usize: 443 + i,
@@ -36,8 +45,8 @@ fn test_dynamic_add_one() {
         my_64_vec: vec![i as u64],
     };
     let my_service = ObjectPersistOnDiskService::<DynamicStruct>::new(
-        "data.bin".to_string(),
-        "StringDynamicData.bin".to_string(),
+        "data0.bin".to_string(),
+        "StringDynamicData0.bin".to_string(),
         1024,
     )
     .unwrap();
@@ -45,7 +54,9 @@ fn test_dynamic_add_one() {
 }
 
 #[test]
-fn test_dynamic_add_bulk() {
+fn test_dynamic_bulk() {
+    remove_file("data.bin");
+    remove_file("StringDynamicData.bin");
     let mut my_vec = Vec::new();
     let mut objs = Vec::new();
     let my_service = ObjectPersistOnDiskService::<DynamicStruct>::new(
@@ -74,19 +85,10 @@ fn test_dynamic_add_bulk() {
     my_service.add_bulk(objs);
     let duration = start.elapsed(); // 计算时间差
     println!("add  {} items   took: {:?}", COUNT, duration);
-}
-
-#[test]
-fn test_dynamic_read_bulk() {
-    test_dynamic_add_bulk();
-    let my_service = ObjectPersistOnDiskService::<DynamicStruct>::new(
-        "data.bin".to_string(),
-        "StringDynamicData.bin".to_string(),
-        1024,
-    )
-    .unwrap();
     let start = Instant::now(); // 记录开始时间
     my_service.read_bulk(0, COUNT);
     let duration = start.elapsed(); // 计算时间差
     println!("read {} items   took: {:?}", COUNT, duration);
 }
+
+

@@ -140,13 +140,13 @@ fn test_one_by_one_cache_engine_sample() {
 
 #[test]
 fn test_cache_engine_sample_bulk() {
-    remove_file("cacheS4.bin");
-    remove_file("cacheSD4.bin");
+    remove_file("cacheS411.bin");
+    remove_file("cacheSD411.bin");
     let mut objs = Vec::new();
     let my_service: ReadableCache<WritableCache<DynamicVectorManageService<SampleData>, SampleData>, SampleData> =
                 VectorEngine::<SampleData>::new(
-                    "cacheS4.bin".to_string(),
-                    "cacheSD4.bin".to_string(),
+                    "cacheS411.bin".to_string(),
+                    "cacheSD411.bin".to_string(),
                     1024,
                 );
     for i in 0..COUNT {
@@ -161,7 +161,7 @@ fn test_cache_engine_sample_bulk() {
         objs.push(my_obj);
     }
     let start = Instant::now(); // 记录开始时间
-    my_service.extend(objs);
+    my_service.pushx(objs);
     let duration = start.elapsed(); 
     println!("extend   {} items   took: {:?}", COUNT, duration);
     assert_eq!(COUNT, my_service.len());
@@ -179,7 +179,7 @@ fn test_cache_engine_read_sample_bulk() {
                     1024,
                 );
     let start = Instant::now();
-    my_service.extend(objs);
+    my_service.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", COUNT, extend_duration);
     let objs = my_service.pullx(0, COUNT as u64);
@@ -204,13 +204,13 @@ fn test_cache_engine_mix_sample_bulk() {
     let start = Instant::now();
     let objs_len = objs.len();
     let objs1_len = objs1.len();
-    my_service.extend(objs);
+    my_service.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", objs_len, extend_duration);
     my_service.pullx(0, objs_len as u64);
     let pull_duration = start.elapsed();
     println!("pull {} items  took: {:?}", objs_len, pull_duration - extend_duration);
-    my_service.extend(objs1);
+    my_service.pushx(objs1);
     let extend_duration1 = start.elapsed();
     println!("second  extend {} items  took: {:?}", objs1_len, extend_duration1 - pull_duration);
     let objs = my_service.pullx(0, COUNT as u64);
@@ -235,7 +235,7 @@ remove_file("SampleDataM.bin");
                 ));
 
     let start = Instant::now();
-    read_cache_service_origin.extend(objs);
+    read_cache_service_origin.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", COUNT, extend_duration);
 
@@ -289,7 +289,7 @@ fn test_cache_engine_compare_getting_sample_multi_thread() {
                 ).unwrap());
 
     let start = Instant::now();
-    read_cache_service_origin.extend(objs);
+    read_cache_service_origin.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", COUNT, extend_duration);
 
@@ -342,7 +342,7 @@ remove_file("SampleDataMP.bin");
                 ));
 
     let start = Instant::now();
-    read_cache_service_origin.extend(objs);
+    read_cache_service_origin.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", COUNT, extend_duration);
 
