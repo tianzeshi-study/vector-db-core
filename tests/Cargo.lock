@@ -160,24 +160,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dynamic-vector"
-version = "0.1.0"
-dependencies = [
- "dynamic-vector-macro",
-]
-
-[[package]]
-name = "dynamic-vector-macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "rayon",
- "serde",
- "syn",
-]
-
-[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -642,7 +624,6 @@ name = "vector-db-core"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "dynamic-vector",
  "rayon",
  "serde",
  "serde_json",

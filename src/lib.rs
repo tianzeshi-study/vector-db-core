@@ -16,8 +16,8 @@ pub use services::{
 };
 pub use vector_engine::VectorEngine;
 
-pub use dynamic_vector::{
-    CheckDynamicSize,
-    DynamicVector,
-    VectorCandidate,
-};
+// pub use dynamic_vector::{
+    // CheckDynamicSize,
+    // DynamicVector,
+    // VectorCandidate,
+// };

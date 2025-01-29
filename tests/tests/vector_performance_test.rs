@@ -7,7 +7,7 @@ use vector_db_core::*;
 
 const COUNT: usize = 10000;
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, CheckDynamicSize)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct DynamicStruct {
     my_usize: usize,
     my_u64: u64,
