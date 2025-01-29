@@ -6,7 +6,7 @@ authors = ["Hal Articode <halarticode@aiursoft.tech>"]
 categories = ["database"]
 description = "A high-performance vector database core for reading and writing historical records such as logs and chat records"
 keywords = ["vector", "database", "history", "log"]
-license = "mit"
+license = "MIT"
 repository = "https://github.com/tianzeshi-study/vector-db-core"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
