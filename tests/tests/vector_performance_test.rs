@@ -45,7 +45,7 @@ fn test_dynamic_vector_one() {
         my_64_vec: vec![i as u64],
         my_string: format!("hello, {} world", i),
     };
-    let mut my_service = DynamicVectorManageService::<DynamicStruct>::new(
+    let my_service = DynamicVectorManageService::<DynamicStruct>::new(
         "vector.bin".to_string(),
         "StringDynamicvector.bin".to_string(),
         1024,
@@ -63,7 +63,7 @@ fn test_dynamic_vector_bulk() {
     remove_file("StringDynamicvector11.bin");
     let mut my_vec = Vec::new();
     let mut objs = Vec::new();
-    let mut my_service = DynamicVectorManageService::<DynamicStruct>::new(
+    let my_service = DynamicVectorManageService::<DynamicStruct>::new(
         "vector11.bin".to_string(),
         "StringDynamicvector11.bin".to_string(),
         1024,

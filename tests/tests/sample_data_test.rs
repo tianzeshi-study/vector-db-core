@@ -27,7 +27,7 @@ fn test_save_sample_one() {
         my_boolean1: i % 2 == 0,
         my_string2: Some(format!("This is another longer string. {}", i).to_string()),
     };
-    let mut my_service = DynamicVectorManageService::<SampleData>::new(
+    let my_service = DynamicVectorManageService::<SampleData>::new(
         "sampleData.bin".to_string(),
         "StringDynamicsampleData.bin".to_string(),
         1024,
@@ -54,7 +54,7 @@ fn test_load_sample_one() {
 #[test]
 fn test_save_sample_bulk() {
     let mut objs = Vec::new();
-    let mut my_service = DynamicVectorManageService::<SampleData>::new(
+    let my_service = DynamicVectorManageService::<SampleData>::new(
         "sampleData.bin".to_string(),
         "StringDynamicsampleData.bin".to_string(),
         1024,
@@ -100,7 +100,7 @@ fn test_load_sample_bulk() {
 #[test]
 fn test_io_sample_bulk() {
     let mut objs = Vec::new();
-    let mut my_service = DynamicVectorManageService::<SampleData>::new(
+    let my_service = DynamicVectorManageService::<SampleData>::new(
         "sampleDataIo.bin".to_string(),
         "StringDynamicsampleDataIo.bin".to_string(),
         1024,

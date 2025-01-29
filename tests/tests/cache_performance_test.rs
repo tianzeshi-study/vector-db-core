@@ -11,7 +11,6 @@ use std::{
     time::Instant,
 };
 use vector_db_core::{
-    DynamicVectorManageService,
     ReadableCache,
     StaticVectorManageService,
     WritableCache,

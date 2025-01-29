@@ -1,10 +1,7 @@
 use rayon::prelude::*; 
 use rand::Rng;
 use std::{
-    sync::{
-        Arc,
-        Mutex,
-    },
+    sync::Arc,
     time::Instant,
 };
 use serde::{

@@ -71,26 +71,26 @@ impl TestStruct {
 
         let sha256_hash = {
             let mut hasher = Sha256::new();
-            hasher.update(data.clone());
+            hasher.update(data);
             hasher.finalize()
         };
 
         let sha512_hash = {
             let mut hasher = Sha512::new();
-            hasher.update(data.clone());
+            hasher.update(data);
             hasher.finalize()
         };
 
         let blake2b_hash: [u8; 64] = {
             let mut hasher = Blake2b::new();
-            hasher.update(data.clone());
+            hasher.update(data);
             hasher.finalize()
         }
         .into();
 
         let blake2s_hash = {
             let mut hasher = Blake2s::new();
-            hasher.update(data.clone());
+            hasher.update(data);
             hasher.finalize()
         };
 
