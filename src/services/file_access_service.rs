@@ -4,7 +4,6 @@ use std::{
         OpenOptions,
     },
     io::{
-        self,
         Read,
         Seek,
         SeekFrom,
@@ -59,7 +58,6 @@ impl FileAccessService {
             .expect("Unable to seek to offset");
         fs.write_all(data).expect("Unable to write data");
     }
-
 
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
         let current_size = &self.get_updated_current_file_size();

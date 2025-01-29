@@ -5,7 +5,10 @@ mod vector_engine;
 
 mod services;
 
-pub use cache::{ReadableCache,WritableCache};
+pub use cache::{
+    ReadableCache,
+    WritableCache,
+};
 pub use services::{
     dynamic_vector_manage_service::*,
     // object_persist_on_disk_service::*,

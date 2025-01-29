@@ -80,7 +80,7 @@ where
     pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
         let page_data = self.database.pullx(index, count);
 
-        self.add_bulk_to_cache(index, page_data.clone());
+        // self.add_bulk_to_cache(index, page_data.clone());
         page_data
     }
 
@@ -132,10 +132,7 @@ where
                         },
                     );
 
-            cache_clone
-                .lock()
-                .unwrap()
-                .extend(cache_hashmap);
+            cache_clone.lock().unwrap().extend(cache_hashmap);
             let mut lru_list = lru_list_clone.lock().unwrap();
             lru_list.append(&mut cache_linklist);
 
@@ -220,14 +217,10 @@ where
     }
 
     fn pull(&self, index: u64) -> T {
-        
-
         self.getting(index)
     }
 
     fn pullx(&self, index: u64, count: u64) -> Vec<T> {
-        
-
         self.getting_lot(index, count)
     }
 }

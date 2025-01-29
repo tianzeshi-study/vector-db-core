@@ -103,7 +103,6 @@ where
     pub fn get_cache_len(&self) -> usize {
         self.cache.lock().unwrap().len()
     }
-    
 
     pub fn getting_obj_from_cache(&self, index: u64) -> T {
         self.cache.lock().unwrap()[index as usize].clone()
@@ -187,10 +186,9 @@ where
             initial_size_if_not_exists,
         )
     }
-    
+
     fn len(&self) -> usize {
         let (cache_len, base_len) = (self.get_cache_len(), self.get_base_len());
-        
 
         cache_len + base_len
     }
@@ -207,7 +205,6 @@ where
         let cache = self.cache.lock().unwrap();
         let db = self.database.lock().unwrap();
         if index < db.len() as u64 {
-            
             db.pull(index)
         } else if index >= db.len() as u64 && index < (db.len() + cache.len()) as u64 {
             if let Some(obj) = cache.get(index as usize - db.len()) {

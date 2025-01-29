@@ -136,6 +136,16 @@ fn test_one_by_one_cache_engine_sample() {
     let one_by_one_pull_duration = start.elapsed(); 
     println!("one by one pull  {} items   took: {:?}", COUNT,  one_by_one_pull_duration -duration);
     assert_eq!(my_service.len(), COUNT as usize);
+    
+    
+    let start = Instant::now();
+    for i in 0..COUNT {
+    let obj = my_service.get( i as u64).unwrap();
+    }
+    let one_by_one_get_duration = start.elapsed(); 
+    println!("one by one get  {} items   took: {:?}", COUNT,  one_by_one_get_duration -duration);
+    assert_eq!(my_service.len(), COUNT as usize);
+    
 }
 
 #[test]
@@ -187,6 +197,19 @@ fn test_cache_engine_read_sample_bulk() {
     println!("load {} items   took: {:?}", COUNT, read_bulk_duration - extend_duration);
     assert_eq!(objs.len(), COUNT);
     assert_eq!(my_service.len(), COUNT);
+    
+    let start = Instant::now();
+    let objs = my_service.getx(0, COUNT as u64).unwrap();
+let getx_duration = start.elapsed();
+    println!("load {} items   took: {:?}", COUNT, getx_duration);
+    assert_eq!(objs.len(), COUNT);
+
+let start = Instant::now();
+    let objs = my_service.getall().unwrap();
+let getx_duration = start.elapsed();
+    println!("load {} items   took: {:?}", COUNT, getx_duration);
+    assert_eq!(objs.len(), COUNT);
+
 }
 
 #[test]

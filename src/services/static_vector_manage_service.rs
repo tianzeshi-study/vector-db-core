@@ -15,8 +15,6 @@ use std::{
     },
 };
 
-pub use dynamic_vector::VectorCandidate;
-
 use crate::services::file_access_service::FileAccessService;
 
 const LENGTH_MARKER_SIZE: usize = size_of::<u64>();
@@ -66,8 +64,6 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-        
-
         u64::from_le_bytes(buffer[0..8].try_into().unwrap())
     }
 
@@ -91,8 +87,7 @@ where
 
         println!("bytes length of data to write once: {} ", &data.len());
 
-        let offset =
-            (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
         let file = self.structure_file.lock().unwrap();
         file.write_in_file(offset, &data);
@@ -120,15 +115,12 @@ where
             current_position += serialized_size;
         }
 
-        let offset =
-            (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
         let file_guard = self.structure_file.lock().unwrap();
 
         file_guard.write_in_file(offset, &buffer);
     }
-
-    
 
     pub fn add(&self, obj: T) {
         let index_to_write = {
@@ -154,8 +146,6 @@ where
 
         self.bulk_write_index(index_to_write, objs);
     }
-
-
 
     pub fn read(&self, index: u64) -> T {
         let size_of_object = size_of::<T>();

@@ -75,8 +75,6 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-        
-
         u64::from_le_bytes(buffer[0..8].try_into().unwrap())
     }
 
@@ -215,8 +213,8 @@ where
             self.save_length(*length);
             index
         };
-        let file_offset = index_to_write * LENGTH_MARKER_SIZE as u64 * 2
-            + LENGTH_MARKER_SIZE as u64;
+        let file_offset =
+            index_to_write * LENGTH_MARKER_SIZE as u64 * 2 + LENGTH_MARKER_SIZE as u64;
         let (start_offset, end_offset) = self.save_dynamic(obj);
         let mut bytes_offset: Vec<u8> = start_offset.to_le_bytes().to_vec();
         let bytes_total_length: Vec<u8> = end_offset.to_le_bytes().to_vec();
@@ -252,8 +250,8 @@ where
             self.save_length(*length);
             (index, *length)
         };
-        let file_offset = index_to_write * LENGTH_MARKER_SIZE as u64 * 2
-            + LENGTH_MARKER_SIZE as u64;
+        let file_offset =
+            index_to_write * LENGTH_MARKER_SIZE as u64 * 2 + LENGTH_MARKER_SIZE as u64;
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
         let save_dynamic_duration = start.elapsed();
@@ -298,8 +296,8 @@ where
             self.save_length(*length);
             (index, *length)
         };
-        let file_offset = index_to_write * LENGTH_MARKER_SIZE as u64 * 2
-            + LENGTH_MARKER_SIZE as u64;
+        let file_offset =
+            index_to_write * LENGTH_MARKER_SIZE as u64 * 2 + LENGTH_MARKER_SIZE as u64;
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
         let save_dynamic_duration = start.elapsed();

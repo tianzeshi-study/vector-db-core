@@ -59,10 +59,7 @@ impl StringRepository {
 
         self.file_access
             .write_in_file(0, &self.file_end_offset.lock().unwrap().to_le_bytes());
-        (
-            current_offset,
-            current_offset + bytes_vector.len() as u64,
-        )
+        (current_offset, current_offset + bytes_vector.len() as u64)
     }
 
     pub fn write_string_content_and_get_offset(
