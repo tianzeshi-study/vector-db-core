@@ -75,17 +75,6 @@ fn test_save_sample_bulk() {
     my_service.save_bulk(objs);
     let duration = start.elapsed(); // 计算时间差
     println!("save  {} items   took: {:?}", COUNT, duration);
-}
-
-#[test]
-fn test_load_sample_bulk() {
-    test_save_sample_bulk();
-    let my_service = DynamicVectorManageService::<SampleData>::new(
-        "sampleData.bin".to_string(),
-        "StringDynamicsampleData.bin".to_string(),
-        1024,
-    )
-    .unwrap();
     let start = Instant::now(); // 记录开始时间
     let objs = my_service.load_bulk(0, COUNT as u64);
     println!(
@@ -96,6 +85,8 @@ fn test_load_sample_bulk() {
     let duration = start.elapsed(); // 计算时间差
     println!("load {} items   took: {:?}", COUNT, duration);
 }
+
+
 
 #[test]
 fn test_io_sample_bulk() {
