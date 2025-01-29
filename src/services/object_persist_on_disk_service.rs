@@ -86,9 +86,9 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-        let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
+        
 
-        length
+        u64::from_le_bytes(buffer[0..8].try_into().unwrap())
     }
 
     fn save_length(&self, length: u64) {
@@ -113,7 +113,7 @@ where
             println!("bytes length of data to write once: {} ", &data.len());
 
             let offset =
-                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
             let file = self.structure_file.lock().unwrap();
             file.write_in_file(offset, &data);
@@ -132,7 +132,7 @@ where
             );
 
             let offset =
-                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
             let file_guard = self.structure_file.lock().unwrap();
             file_guard.write_in_file(offset, &data);
@@ -158,7 +158,7 @@ where
                 println!("white_space: {}", white_space);
 
                 buffer[current_position..current_position + serialized_size]
-                    .copy_from_slice(&serialized_obj);
+                    .copy_from_slice(serialized_obj);
                 current_position += white_space;
 
                 current_position += serialized_size;
@@ -174,7 +174,7 @@ where
             println!("bytes of vec_data:{}", vec_data[0].len() * vec_data.len());
 
             let offset =
-                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
             println!("bulk write offset: {}", offset);
 
             let file_guard = self.structure_file.lock().unwrap();
@@ -183,7 +183,7 @@ where
         } else {
             let size_of_object = get_item_size::<T>();
             let offset =
-                (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+                (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
             let count = objs.len();
 
             let start = Instant::now();
@@ -224,7 +224,7 @@ where
                 let white_space = size_of_object - serialized_size;
 
                 buffer[current_position..current_position + serialized_size]
-                    .copy_from_slice(&serialized_obj);
+                    .copy_from_slice(serialized_obj);
                 current_position += white_space;
 
                 current_position += serialized_size;
@@ -250,7 +250,7 @@ where
             self.save_length(*length);
             index
         };
-        self.write_index(index_to_write.into(), obj);
+        self.write_index(index_to_write, obj);
     }
 
     pub fn add_bulk(&self, objs: Vec<T>) {
@@ -264,12 +264,12 @@ where
             index
         };
         println!("add bulk index_to_write:{}", index_to_write);
-        self.bulk_write_index(index_to_write.into(), objs);
+        self.bulk_write_index(index_to_write, objs);
     }
 
     pub fn read(&self, index: usize) -> T {
         let size_of_object = get_item_size::<T>();
-        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        let offset = (size_of_object * index + LENGTH_MARKER_SIZE) as u64;
 
         println!("read offset:{}", offset);
 
@@ -281,19 +281,19 @@ where
         let obj: T = bincode::deserialize(&data).expect("Deserialization failed");
         println!("{:?}", obj);
         if !obj.is_dynamic_structure() {
-            return obj;
+            obj
         } else {
             let decoded_objs: Vec<Value> = self.load_object_dynamic(vec![obj]);
             let decoded_obj = decoded_objs[0].clone();
-            let result_obj = serde_json::from_value(decoded_obj).unwrap();
+            
 
-            return result_obj;
+            serde_json::from_value(decoded_obj).unwrap()
         }
     }
 
     pub fn read_bulk(&self, index: usize, count: usize) -> Vec<T> {
         let size_of_object = get_item_size::<T>();
-        let offset = (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
+        let offset = (size_of_object * index + LENGTH_MARKER_SIZE) as u64;
         println!("read offset:{}", offset);
         let length = count * size_of_object;
         println!("read length:{}", length);
@@ -307,7 +307,7 @@ where
             .collect();
 
         if !objs[0].is_dynamic_structure() {
-            return objs;
+            objs
         } else {
             let decoded_objs: Vec<Value> = self.load_object_dynamic(objs);
 
@@ -316,7 +316,7 @@ where
                 .map(|obj| serde_json::from_value(obj.clone()).unwrap())
                 .collect();
 
-            return result_objs;
+            result_objs
         }
     }
 
@@ -376,7 +376,7 @@ where
             let file_path_str = file_path.to_string_lossy().into_owned();
             let string_repository = StringRepository::new(
                 file_path_str,
-                self.initial_size_if_not_exists.clone(),
+                self.initial_size_if_not_exists,
             );
 
             let (offset, _end_offset) =
@@ -480,7 +480,7 @@ where
             let file_path_str = file_path.to_string_lossy().into_owned();
             let string_repository = StringRepository::new(
                 file_path_str,
-                self.initial_size_if_not_exists.clone(),
+                self.initial_size_if_not_exists,
             );
 
             let start_offset: usize = field_obj_len_list[0][0];

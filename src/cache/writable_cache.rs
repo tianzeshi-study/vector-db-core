@@ -70,7 +70,7 @@ where
             if cache.len() >= max_cache_items {
                 objs.append(&mut *cache);
             }
-            if objs.len() != 0 {
+            if !objs.is_empty() {
                 database_clone.lock().unwrap().pushx(objs);
             }
         });
@@ -90,7 +90,7 @@ where
             if cache.len() >= max_cache_items {
                 objs.append(&mut *cache);
             }
-            if objs.len() != 0 {
+            if !objs.is_empty() {
                 database_clone.lock().unwrap().pushx(objs);
             }
         });
@@ -103,12 +103,7 @@ where
     pub fn get_cache_len(&self) -> usize {
         self.cache.lock().unwrap().len()
     }
-    pub fn len(&self) -> usize {
-        let (cache_len, base_len) = (self.get_cache_len(), self.get_base_len());
-        let length = cache_len + base_len;
-
-        length
-    }
+    
 
     pub fn getting_obj_from_cache(&self, index: u64) -> T {
         self.cache.lock().unwrap()[index as usize].clone()
@@ -192,8 +187,12 @@ where
             initial_size_if_not_exists,
         )
     }
+    
     fn len(&self) -> usize {
-        self.len()
+        let (cache_len, base_len) = (self.get_cache_len(), self.get_base_len());
+        
+
+        cache_len + base_len
     }
 
     fn push(&self, obj: T) {
@@ -208,8 +207,8 @@ where
         let cache = self.cache.lock().unwrap();
         let db = self.database.lock().unwrap();
         if index < db.len() as u64 {
-            let obj = db.pull(index);
-            return obj;
+            
+            db.pull(index)
         } else if index >= db.len() as u64 && index < (db.len() + cache.len()) as u64 {
             if let Some(obj) = cache.get(index as usize - db.len()) {
                 return obj.clone();
@@ -237,7 +236,7 @@ where
         let end_index = index + count - 1;
         if end_index < db.len() as u64 {
             println!("reading in database");
-            return db.pullx(index, count);
+            db.pullx(index, count)
         } else if index < db.len() as u64 && end_index < (db.len() + cache.len()) as u64 {
             println!("reading in database and cache");
             let mut front = db.pullx(index, db.len() as u64 - index);

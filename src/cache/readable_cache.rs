@@ -126,7 +126,7 @@ where
                     .reduce(
                         || (HashMap::with_capacity(objs_len), LinkedList::new()),
                         |(mut map1, mut link1), (map2, mut link2)| {
-                            map1.extend(map2.into_iter());
+                            map1.extend(map2);
                             link1.append(&mut link2);
                             (map1, link1)
                         },
@@ -135,7 +135,7 @@ where
             cache_clone
                 .lock()
                 .unwrap()
-                .extend(cache_hashmap.into_iter());
+                .extend(cache_hashmap);
             let mut lru_list = lru_list_clone.lock().unwrap();
             lru_list.append(&mut cache_linklist);
 
@@ -220,15 +220,15 @@ where
     }
 
     fn pull(&self, index: u64) -> T {
-        let obj = self.getting(index);
+        
 
-        obj
+        self.getting(index)
     }
 
     fn pullx(&self, index: u64, count: u64) -> Vec<T> {
-        let objs = self.getting_lot(index, count);
+        
 
-        objs
+        self.getting_lot(index, count)
     }
 }
 

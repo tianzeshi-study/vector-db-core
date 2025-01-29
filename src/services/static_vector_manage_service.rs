@@ -66,9 +66,9 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-        let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
+        
 
-        length
+        u64::from_le_bytes(buffer[0..8].try_into().unwrap())
     }
 
     fn save_length(&self, length: u64) {
@@ -92,7 +92,7 @@ where
         println!("bytes length of data to write once: {} ", &data.len());
 
         let offset =
-            (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
         let file = self.structure_file.lock().unwrap();
         file.write_in_file(offset, &data);
@@ -114,61 +114,21 @@ where
             let white_space = size_of_object - serialized_size;
 
             buffer[current_position..current_position + serialized_size]
-                .copy_from_slice(&serialized_obj);
+                .copy_from_slice(serialized_obj);
             current_position += white_space;
 
             current_position += serialized_size;
         }
 
         let offset =
-            (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
+            (size_of_object * index as usize + LENGTH_MARKER_SIZE) as u64;
 
         let file_guard = self.structure_file.lock().unwrap();
 
         file_guard.write_in_file(offset, &buffer);
     }
 
-    fn bulk_write_index_control(&self, index: u64, objs: Vec<T>) -> io::Result<()> {
-        let size_of_object = size_of::<T>();
-        let count = objs.len();
-        let mut buffer: Vec<u8> = vec![0; size_of_object * count];
-        println!("length of buffer: {}", buffer.len());
-
-        let serialized_objs: Vec<Vec<u8>> = objs
-            .par_iter()
-            .map(|obj| Self::serialize_object(obj))
-            .collect::<Vec<Vec<u8>>>();
-
-        let mut current_position = 0;
-        for serialized_obj in &serialized_objs {
-            let serialized_size = serialized_obj.len();
-            let white_space = size_of_object - serialized_size;
-
-            buffer[current_position..current_position + serialized_size]
-                .copy_from_slice(&serialized_obj);
-            current_position += white_space;
-
-            current_position += serialized_size;
-        }
-
-        let vec_data: Vec<Vec<u8>> = objs
-            .par_iter()
-            .map(|obj| Self::serialize_object(obj))
-            .collect::<Vec<Vec<u8>>>();
-        println!("bulk write size_of_object:{}", size_of_object);
-        println!("length of  vec_data:{}", vec_data.len());
-        println!("length of  item of vec_data:{}", vec_data[0].len());
-        println!("bytes of vec_data:{}", vec_data[0].len() * vec_data.len());
-
-        let offset =
-            (size_of_object * index as usize + LENGTH_MARKER_SIZE as usize) as u64;
-        println!("bulk write offset: {}", offset);
-
-        let file_guard = self.structure_file.lock().unwrap();
-
-        file_guard.write_in_file_control(offset, &buffer).unwrap();
-        Ok(())
-    }
+    
 
     pub fn add(&self, obj: T) {
         let index_to_write = {
@@ -178,7 +138,7 @@ where
             self.save_length(*length);
             index
         };
-        self.write_index(index_to_write.into(), obj);
+        self.write_index(index_to_write, obj);
     }
 
     pub fn add_bulk(&self, objs: Vec<T>) {
@@ -192,24 +152,10 @@ where
             index
         };
 
-        self.bulk_write_index(index_to_write.into(), objs);
+        self.bulk_write_index(index_to_write, objs);
     }
 
-    pub fn add_bulk_control(&self, objs: Vec<T>) -> io::Result<()> {
-        let index_to_write = {
-            let mut length = self.length.lock().unwrap();
-            let count = objs.len();
-            let index = *length;
-            *length += count as u64;
 
-            self.save_length(*length);
-            index
-        };
-        println!("add bulk index_to_write:{}", index_to_write);
-        self.bulk_write_index_control(index_to_write.into(), objs)
-            .unwrap();
-        Ok(())
-    }
 
     pub fn read(&self, index: u64) -> T {
         let size_of_object = size_of::<T>();

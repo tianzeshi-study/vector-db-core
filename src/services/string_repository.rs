@@ -51,7 +51,7 @@ impl StringRepository {
         &mut self,
         bytes_vector: Vec<u8>,
     ) -> (u64, u64) {
-        let current_offset = self.file_end_offset.lock().unwrap().clone();
+        let current_offset = *self.file_end_offset.lock().unwrap();
 
         self.file_access
             .write_in_file(END_OFFSET_SIZE as u64 + current_offset + 1, &bytes_vector);
@@ -60,7 +60,7 @@ impl StringRepository {
         self.file_access
             .write_in_file(0, &self.file_end_offset.lock().unwrap().to_le_bytes());
         (
-            current_offset as u64,
+            current_offset,
             current_offset + bytes_vector.len() as u64,
         )
     }
@@ -73,16 +73,16 @@ impl StringRepository {
             let mut current_offset = self.file_end_offset.lock().unwrap();
 
             self.file_access.write_in_file(
-                END_OFFSET_SIZE as u64 + current_offset.clone() + 1,
+                END_OFFSET_SIZE as u64 + *current_offset + 1,
                 &bytes_vector,
             );
 
             *current_offset += bytes_vector.len() as u64;
 
             self.file_access
-                .write_in_file(0, &current_offset.clone().to_le_bytes());
+                .write_in_file(0, &(*current_offset).to_le_bytes());
 
-            current_offset.clone()
+            *current_offset
         };
 
         (current_offset - bytes_vector.len() as u64, current_offset)
@@ -93,7 +93,7 @@ impl StringRepository {
 
         let string_bytes: Vec<u8> = self
             .file_access
-            .read_in_file(END_OFFSET_SIZE as u64 + offset as u64, length as usize);
+            .read_in_file(END_OFFSET_SIZE as u64 + offset, length as usize);
 
         string_bytes
     }

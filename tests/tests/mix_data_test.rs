@@ -186,7 +186,7 @@ fn test_controled_io_mix_data() {
             println!("Instance {}: {:?}", i, instance);
         }
     }
-    my_service.add_bulk_control(objs).unwrap();
+    my_service.add_bulk(objs);
     my_service.read_bulk(0, COUNT);
 }
 

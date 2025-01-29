@@ -60,28 +60,6 @@ impl FileAccessService {
         fs.write_all(data).expect("Unable to write data");
     }
 
-    pub fn write_in_file_control(&self, offset: u64, data: &[u8]) -> io::Result<()> {
-        let mut current_size = self.current_size.lock().unwrap();
-
-        while offset + data.len() as u64 > *current_size {
-            let fs = OpenOptions::new()
-                .write(true)
-                .open(&self.path)
-                .expect("Unable to open file");
-            fs.set_len(*current_size * 2)
-                .expect("Unable to extend file size");
-            *current_size *= 2;
-        }
-
-        let mut fs = OpenOptions::new()
-            .write(true)
-            .open(&self.path)
-            .expect("Unable to open file");
-        fs.seek(SeekFrom::Start(offset))
-            .expect("Unable to seek to offset");
-        fs.write_all(data).expect("Unable to write data");
-        Ok(())
-    }
 
     pub fn read_in_file(&self, offset: u64, length: usize) -> Vec<u8> {
         let current_size = &self.get_updated_current_file_size();

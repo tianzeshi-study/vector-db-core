@@ -75,9 +75,9 @@ where
 
         assert!(buffer.len() >= 4, "Buffer length must be at least 4 bytes.");
 
-        let length = u64::from_le_bytes(buffer[0..8].try_into().unwrap());
+        
 
-        length
+        u64::from_le_bytes(buffer[0..8].try_into().unwrap())
     }
 
     fn save_length(&self, length: u64) {
@@ -201,7 +201,7 @@ where
 
         let objs: Vec<T> = byte_vectors
             .par_iter()
-            .map(|obj| bincode::deserialize(&obj).expect("Serialization failed"))
+            .map(|obj| bincode::deserialize(obj).expect("Serialization failed"))
             .collect();
 
         objs
@@ -215,7 +215,7 @@ where
             self.save_length(*length);
             index
         };
-        let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
+        let file_offset = index_to_write * LENGTH_MARKER_SIZE as u64 * 2
             + LENGTH_MARKER_SIZE as u64;
         let (start_offset, end_offset) = self.save_dynamic(obj);
         let mut bytes_offset: Vec<u8> = start_offset.to_le_bytes().to_vec();
@@ -227,7 +227,7 @@ where
 
     pub fn load(&self, index: u64) -> T {
         let file_offset =
-            2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
+            2 * LENGTH_MARKER_SIZE as u64 * index + LENGTH_MARKER_SIZE as u64;
 
         let file_guard = self.structure_file.lock().unwrap();
         let marker_data: Vec<u8> =
@@ -252,7 +252,7 @@ where
             self.save_length(*length);
             (index, *length)
         };
-        let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
+        let file_offset = index_to_write * LENGTH_MARKER_SIZE as u64 * 2
             + LENGTH_MARKER_SIZE as u64;
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
@@ -298,7 +298,7 @@ where
             self.save_length(*length);
             (index, *length)
         };
-        let file_offset = index_to_write as u64 * LENGTH_MARKER_SIZE as u64 * 2
+        let file_offset = index_to_write * LENGTH_MARKER_SIZE as u64 * 2
             + LENGTH_MARKER_SIZE as u64;
         let start = Instant::now();
         let start_offset_and_end_offset: Vec<(u64, u64)> = self.save_dynamic_bulk(objs);
@@ -333,7 +333,7 @@ where
 
     pub fn load_bulk(&self, index: u64, count: u64) -> Vec<T> {
         let file_offset =
-            2 * LENGTH_MARKER_SIZE as u64 * index as u64 + LENGTH_MARKER_SIZE as u64;
+            2 * LENGTH_MARKER_SIZE as u64 * index + LENGTH_MARKER_SIZE as u64;
         let file_guard = self.structure_file.lock().unwrap();
         let marker_data: Vec<u8> =
             file_guard.read_in_file(file_offset, 2 * LENGTH_MARKER_SIZE * count as usize);

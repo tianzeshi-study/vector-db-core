@@ -1,14 +1,20 @@
 #![feature(linked_list_cursors)]
 
-mod database_with_cache;
+mod cache;
 mod vector_engine;
 
-pub mod services;
+mod services;
 
-pub use database_with_cache::*;
+pub use cache::{ReadableCache,WritableCache};
 pub use services::{
     dynamic_vector_manage_service::*,
-    object_persist_on_disk_service::*,
+    // object_persist_on_disk_service::*,
     static_vector_manage_service::*,
 };
-pub use vector_engine::*;
+pub use vector_engine::VectorEngine;
+
+pub use dynamic_vector::{
+    CheckDynamicSize,
+    DynamicVector,
+    VectorCandidate,
+};
