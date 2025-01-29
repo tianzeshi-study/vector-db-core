@@ -140,7 +140,7 @@ fn test_one_by_one_cache_engine_sample() {
     let obj = my_service.get( i as u64).unwrap();
     }
     let one_by_one_get_duration = start.elapsed(); 
-    println!("one by one get  {} items   took: {:?}", COUNT,  one_by_one_get_duration -duration);
+    println!("one by one get  {} items   took: {:?}", COUNT,  one_by_one_get_duration);
     assert_eq!(my_service.len(), COUNT as usize);
     
 }
