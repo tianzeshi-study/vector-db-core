@@ -78,10 +78,8 @@ where
     }
 
     pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
-        let page_data = self.database.pullx(index, count);
-
         // self.add_bulk_to_cache(index, page_data.clone());
-        page_data
+        self.database.pullx(index, count)
     }
 
     pub fn add_to_cache(&self, index: u64, data: T) {
