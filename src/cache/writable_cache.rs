@@ -7,7 +7,6 @@ use std::sync::{
     Mutex,
 };
 
-
 use crate::vector_engine::VectorEngine;
 
 const MAX_CACHE_ITEMS: usize = 500000;
@@ -26,7 +25,6 @@ where
     database: Arc<Mutex<D>>,
     cache: Arc<Mutex<Vec<T>>>,
     max_cache_items: usize,
-
 }
 
 impl<D, T> WritableCache<D, T>
@@ -45,47 +43,35 @@ where
         dynamic_repository: String,
         initial_size_if_not_exists: u64,
     ) -> Self {
-
-
         let database = Arc::new(Mutex::<D>::new(VectorEngine::new(
-                static_repository,
-                dynamic_repository,
-                initial_size_if_not_exists,
-            )));
+            static_repository,
+            dynamic_repository,
+            initial_size_if_not_exists,
+        )));
         let cache = Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS)));
         let cache_clone = Arc::clone(&cache);
         let database_clone = Arc::clone(&database);
 
-        
-        std::thread::spawn(move || {
-            loop {
-            let mut cache_guard =  cache_clone.lock().unwrap();
+        std::thread::spawn(move || loop {
+            let mut cache_guard = cache_clone.lock().unwrap();
 
-                    
-                    if cache_guard.len() >= MAX_CACHE_ITEMS {
-                        let mut objs = Vec::with_capacity(MAX_CACHE_ITEMS);
-                        objs.append(&mut cache_guard);
-                        database_clone.lock().unwrap().pushx(objs);
-
-                       
-                    }
-
+            if cache_guard.len() >= MAX_CACHE_ITEMS {
+                let mut objs = Vec::with_capacity(MAX_CACHE_ITEMS);
+                objs.append(&mut cache_guard);
+                database_clone.lock().unwrap().pushx(objs);
             }
         });
-        
+
         Self {
-            database: database,
+            database,
 
-            cache: cache,
+            cache,
             max_cache_items: MAX_CACHE_ITEMS,
-
         }
     }
 
-
-    
     pub fn push(&self, obj: T) {
-self.cache.lock().unwrap().push(obj);
+        self.cache.lock().unwrap().push(obj);
     }
 
     pub fn pushx(&self, objs: Vec<T>) {
@@ -169,7 +155,7 @@ where
 {
     fn drop(&mut self) {
         // while let Ok(data) = self.receiver.lock().unwrap().try_recv() {
-            // println!("清理未接收的数据: {:?}", data);
+        // println!("清理未接收的数据: {:?}", data);
         // }
         let mut cache = self.cache.lock().unwrap();
         let max_cache_items = self.max_cache_items;
@@ -286,47 +272,42 @@ where
 impl<D, T> Default for WritableCache<D, T>
 where
     D: VectorEngine<T> + Sync + Send + 'static,
-    T: Serialize+ for<'de> Deserialize<'de>+ 'static+ std::fmt::Debug+ Clone+ Send+ Sync,
-    {
-fn default() -> Self {
-
-
+    T: Serialize
+        + for<'de> Deserialize<'de>
+        + 'static
+        + std::fmt::Debug
+        + Clone
+        + Send
+        + Sync,
+{
+    fn default() -> Self {
         let database = Arc::new(Mutex::<D>::new(VectorEngine::new(
-                "static_repository.bin".to_string(),
-                "dynamic_repository.bin".to_string(),
-                1024*1024,
-            )));
+            "static_repository.bin".to_string(),
+            "dynamic_repository.bin".to_string(),
+            1024 * 1024,
+        )));
         let cache = Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS)));
         let cache_clone = Arc::clone(&cache);
         let database_clone = Arc::clone(&database);
 
-        
-        std::thread::spawn(move || {
-            loop {
-            let mut cache_guard =  cache_clone.lock().unwrap();
+        std::thread::spawn(move || loop {
+            let mut cache_guard = cache_clone.lock().unwrap();
 
-                    
-                    if cache_guard.len() >= MAX_CACHE_ITEMS {
-                        let mut objs = Vec::with_capacity(MAX_CACHE_ITEMS);
-                        objs.append(&mut cache_guard);
-                        database_clone.lock().unwrap().pushx(objs);
-
-                       
-                    }
-
+            if cache_guard.len() >= MAX_CACHE_ITEMS {
+                let mut objs = Vec::with_capacity(MAX_CACHE_ITEMS);
+                objs.append(&mut cache_guard);
+                database_clone.lock().unwrap().pushx(objs);
             }
         });
-        
+
         Self {
-            database: database,
+            database,
 
-            cache: cache,
+            cache,
             max_cache_items: MAX_CACHE_ITEMS,
-
         }
     }
-} 
-
+}
 
 #[cfg(test)]
 mod test {
@@ -347,12 +328,12 @@ mod test {
         my_boolean: bool,
     }
 
-fn remove_file(path: &str) {
-// let path = path.to_string();
+    fn remove_file(path: &str) {
+        // let path = path.to_string();
         if std::path::Path::new(&path).exists() {
             std::fs::remove_file(&path).expect("Unable to remove file");
         }
-}
+    }
 
     #[test]
     fn test_push_static_one() {
