@@ -185,7 +185,6 @@ where
     pub fn add_bulk(&self, objs: Vec<T>) {
         self.database.pushx(objs);
     }
-        
 }
 
 impl<D, T> VectorEngine<T> for ReadableCache<D, T>
