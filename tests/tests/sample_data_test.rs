@@ -86,8 +86,6 @@ fn test_save_sample_bulk() {
     println!("load {} items   took: {:?}", COUNT, duration);
 }
 
-
-
 #[test]
 fn test_io_sample_bulk() {
     let mut objs = Vec::new();

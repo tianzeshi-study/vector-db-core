@@ -13,11 +13,11 @@ use std::{
 use vector_db_core::{
     ReadableCache,
     StaticVectorManageService,
+    VectorEngine,
     WritableCache,
-    VectorEngine
 };
 
-const COUNT: usize = 100;
+const COUNT: usize = 1000;
 const TURNS: usize = 10;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
@@ -30,14 +30,11 @@ pub struct StaticStruct {
     my_boolean: bool,
 }
 
-
-
-
 fn remove_file(path: &str) {
-// let path = path.to_string();
-        if std::path::Path::new(&path).exists() {
-            std::fs::remove_file(&path).expect("Unable to remove file");
-        }
+    // let path = path.to_string();
+    if std::path::Path::new(&path).exists() {
+        std::fs::remove_file(&path).expect("Unable to remove file");
+    }
 }
 
 #[test]
@@ -289,15 +286,15 @@ fn test_compare_static_multi_turns() {
 fn test_writable_cache_getting_static_multi_thread() {
     remove_file("cacheS9.bin");
     remove_file("cacheSD9.bin");
-    const COUNT:usize = 1000; 
+    const COUNT: usize = 1000;
     let mut objs = Vec::new();
-    let write_cache_service: Arc<WritableCache<StaticVectorManageService<StaticStruct>,StaticStruct>> =
-        Arc::new(VectorEngine::<StaticStruct>::new(
-            "cacheS9.bin".to_string(),
-            "cacheSD9.bin".to_string(),
-            1024,
-        ));
-    
+    let write_cache_service: Arc<
+        WritableCache<StaticVectorManageService<StaticStruct>, StaticStruct>,
+    > = Arc::new(VectorEngine::<StaticStruct>::new(
+        "cacheS9.bin".to_string(),
+        "cacheSD9.bin".to_string(),
+        1024,
+    ));
 
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
@@ -352,12 +349,15 @@ fn test_writable_cache_getting_static_multi_thread() {
 fn test_readable_cache_getting_static_multi_thread() {
     remove_file("cacheS9.bin");
     remove_file("cacheSD9.bin");
-    const COUNT:usize = 1000; 
+    const COUNT: usize = 1000;
     let mut objs = Vec::new();
-        let read_cache_service_origin: Arc<ReadableCache<StaticVectorManageService<StaticStruct>,StaticStruct>> =
-        Arc::new(VectorEngine::<StaticStruct>::new(
-            "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
-        ));
+    let read_cache_service_origin: Arc<
+        ReadableCache<StaticVectorManageService<StaticStruct>, StaticStruct>,
+    > = Arc::new(VectorEngine::<StaticStruct>::new(
+        "cacheS.bin".to_string(),
+        "cacheSD.bin".to_string(),
+        1024,
+    ));
     let read_cache_service = Arc::clone(&read_cache_service_origin);
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
@@ -410,7 +410,7 @@ fn test_readable_cache_getting_static_multi_thread() {
 
 // #[test]
 fn test_compare_static_multi_thread() {
-    const COUNT:usize = 1000; 
+    const COUNT: usize = 1000;
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -477,12 +477,10 @@ fn test_compare_static_multi_thread() {
 
 #[test]
 fn test_safe_getting_static_multi_thread() {
-    const COUNT:usize = 1000; 
+    const COUNT: usize = 1000;
     let mut objs = Vec::new();
-        let read_cache_service_origin = Arc::new(Mutex::new(ReadableCache::<
-    WritableCache<
-        StaticVectorManageService<StaticStruct>,
-        StaticStruct>,
+    let read_cache_service_origin = Arc::new(Mutex::new(ReadableCache::<
+        WritableCache<StaticVectorManageService<StaticStruct>, StaticStruct>,
         StaticStruct,
     >::new(
         "cacheS.bin".to_string(),

@@ -22,10 +22,10 @@ pub struct DynamicStruct {
 }
 
 fn remove_file(path: &str) {
-// let path = path.to_string();
-        if std::path::Path::new(&path).exists() {
-            std::fs::remove_file(&path).expect("Unable to remove file");
-        }
+    // let path = path.to_string();
+    if std::path::Path::new(&path).exists() {
+        std::fs::remove_file(&path).expect("Unable to remove file");
+    }
 }
 
 #[test]
@@ -54,8 +54,6 @@ fn test_dynamic_vector_one() {
     my_service.save(my_obj);
     my_service.load(0);
 }
-
-
 
 #[test]
 fn test_dynamic_vector_bulk() {
