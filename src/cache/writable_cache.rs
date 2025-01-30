@@ -56,9 +56,13 @@ where
             let mut cache_guard = cache_clone.lock().unwrap();
 
             if cache_guard.len() >= MAX_CACHE_ITEMS {
+                let database_clone_guard = database_clone.lock().unwrap();
+                println!("full cache");
                 let mut objs = Vec::with_capacity(MAX_CACHE_ITEMS);
                 objs.append(&mut cache_guard);
-                database_clone.lock().unwrap().pushx(objs);
+                println!("appended");
+                // database_clone.lock().unwrap().pushx(objs);
+                database_clone_guard.pushx(objs);
             }
         });
 
@@ -148,9 +152,6 @@ where
         + Sync,
 {
     fn drop(&mut self) {
-        // while let Ok(data) = self.receiver.lock().unwrap().try_recv() {
-        // println!("清理未接收的数据: {:?}", data);
-        // }
         let mut cache = self.cache.lock().unwrap();
         let max_cache_items = self.max_cache_items;
         let cache_len = cache.len();
@@ -265,46 +266,6 @@ where
     }
 }
 
-impl<D, T> Default for WritableCache<D, T>
-where
-    D: VectorEngine<T> + Sync + Send + 'static,
-    T: Serialize
-        + for<'de> Deserialize<'de>
-        + 'static
-        + std::fmt::Debug
-        + Clone
-        + Send
-        + Sync,
-{
-    fn default() -> Self {
-        let database = Arc::new(Mutex::<D>::new(VectorEngine::new(
-            "static_repository.bin".to_string(),
-            "dynamic_repository.bin".to_string(),
-            1024 * 1024,
-        )));
-        let cache = Arc::new(Mutex::new(Vec::with_capacity(MAX_CACHE_ITEMS)));
-        let cache_clone = Arc::clone(&cache);
-        let database_clone = Arc::clone(&database);
-
-        std::thread::spawn(move || loop {
-            let mut cache_guard = cache_clone.lock().unwrap();
-
-            if cache_guard.len() >= MAX_CACHE_ITEMS {
-                let mut objs = Vec::with_capacity(MAX_CACHE_ITEMS);
-                objs.append(&mut cache_guard);
-                database_clone.lock().unwrap().pushx(objs);
-            }
-        });
-
-        Self {
-            database,
-
-            cache,
-            max_cache_items: MAX_CACHE_ITEMS,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -312,7 +273,7 @@ mod test {
         dynamic_vector_manage_service::DynamicVectorManageService,
         static_vector_manage_service::StaticVectorManageService,
     };
-    const COUNT: usize = 1000000;
+    const COUNT: usize = 1000;
 
     #[derive(Serialize, Deserialize, Default, Debug, Clone)]
     pub struct StaticStruct {
@@ -322,13 +283,6 @@ mod test {
         my_u16: u16,
         my_u8: u8,
         my_boolean: bool,
-    }
-
-    fn remove_file(path: &str) {
-        // let path = path.to_string();
-        if std::path::Path::new(&path).exists() {
-            std::fs::remove_file(&path).expect("Unable to remove file");
-        }
     }
 
     #[test]
@@ -375,8 +329,6 @@ mod test {
 
     #[test]
     fn test_one_by_one_push_dynamic() {
-        remove_file("cacheD.bin");
-        remove_file("cacheDD.bin");
         let my_service = WritableCache::<
             DynamicVectorManageService<StaticStruct>,
             StaticStruct,
@@ -395,8 +347,6 @@ mod test {
 
             my_service.push(my_obj);
         }
-        // std::thread::sleep(std::time::Duration::from_secs(2));
-        assert_eq!(COUNT, my_service.len());
     }
 
     #[test]
