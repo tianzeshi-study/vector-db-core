@@ -70,6 +70,7 @@ docs/_build/
 
 # Pyenv
 .python-version
+**Cargo.lock
 *.bin
 *.db
 *.back
