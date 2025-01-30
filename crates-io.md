@@ -1,7 +1,6 @@
 # vector_db_core
 vector database core is a high-performance  Embedded database for reading and writing historical records such as logs and chat records. 
 Fast read and write on both SSDs and HDDs.
-
 ## usage 
 
 ```

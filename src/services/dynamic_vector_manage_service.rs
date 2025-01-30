@@ -477,11 +477,12 @@ mod test {
         let save_bulk_duration = start.elapsed();
         println!("save bulk    took: {:?}", save_bulk_duration);
     }
-    fn save_bulk() {
+
+    #[test]
+    fn test_load_bulk() {
         remove_file("Dynamic.bin");
         remove_file("StringDynamic.bin");
-
-        let write_service = DynamicVectorManageService::<ExampleStruct>::new(
+        let read_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic.bin".to_string(),
             "StringDynamic.bin".to_string(),
             1024,
@@ -499,20 +500,9 @@ mod test {
             objs_list.push(my_obj.clone());
         }
         let start = Instant::now();
-        write_service.save_bulk(objs_list);
+        read_service.save_bulk(objs_list);
         let save_bulk_duration = start.elapsed();
         println!("save bulk    took: {:?}", save_bulk_duration);
-    }
-
-    #[test]
-    fn test_load_bulk() {
-        save_bulk();
-        let read_service = DynamicVectorManageService::<ExampleStruct>::new(
-            "Dynamic.bin".to_string(),
-            "StringDynamic.bin".to_string(),
-            1024,
-        )
-        .unwrap();
         let start = Instant::now();
         let objs = read_service.load_bulk(0, COUNT as u64);
         let load_bulk_duration = start.elapsed();
@@ -525,12 +515,12 @@ mod test {
         assert_eq!(objs[objs.len() - 1].id, COUNT - 1);
         let length = read_service.get_length();
         assert_eq!(length, COUNT as u64);
-        std::fs::remove_file("Dynamic.bin").unwrap();
-        std::fs::remove_file("StringDynamic.bin").unwrap();
     }
 
     #[test]
     fn test_get_dynamic_length() {
+        remove_file("Dynamic.bin");
+        remove_file("StringDynamic.bin");
         let read_service = DynamicVectorManageService::<ExampleStruct>::new(
             "Dynamic.bin".to_string(),
             "StringDynamic.bin".to_string(),

@@ -14,4 +14,3 @@ pub use services::{
     static_vector_manage_service::*,
 };
 pub use vector_engine::VectorEngine;
-
