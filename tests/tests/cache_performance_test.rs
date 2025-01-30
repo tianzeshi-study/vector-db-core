@@ -479,14 +479,10 @@ fn test_compare_static_multi_thread() {
 fn test_safe_getting_static_multi_thread() {
     const COUNT:usize = 1000; 
     let mut objs = Vec::new();
-    let my_service =
-        WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
-    let read_cache_service_origin = Arc::new(Mutex::new(ReadableCache::<
+        let read_cache_service_origin = Arc::new(Mutex::new(ReadableCache::<
+    WritableCache<
         StaticVectorManageService<StaticStruct>,
+        StaticStruct>,
         StaticStruct,
     >::new(
         "cacheS.bin".to_string(),
@@ -508,7 +504,7 @@ fn test_safe_getting_static_multi_thread() {
     }
     // let mut rng = rand::thread_rng();
     let start = Instant::now();
-    my_service.pushx(objs);
+    read_cache_service_origin.lock().unwrap().add_bulk(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let read_cache_service = Arc::clone(&read_cache_service);

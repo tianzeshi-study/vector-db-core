@@ -178,6 +178,14 @@ where
     pub fn get_length(&self) -> usize {
         self.database.len()
     }
+    pub fn add(&self, obj: T) {
+        self.database.push(obj);
+    }
+
+    pub fn add_bulk(&self, objs: Vec<T>) {
+        self.database.pushx(objs);
+    }
+        
 }
 
 impl<D, T> VectorEngine<T> for ReadableCache<D, T>
