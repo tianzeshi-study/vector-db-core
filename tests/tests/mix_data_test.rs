@@ -110,8 +110,31 @@ impl TestStruct {
     }
 }
 
+fn remove_file(path: &str) {
+    // let path = path.to_string();
+    if std::path::Path::new(&path).exists() {
+        std::fs::remove_file(&path).expect("Unable to remove file");
+    }
+}
+
+fn clean(name: &str) -> (String, String) {
+    let temp_dir: std::path::PathBuf = std::env::temp_dir();
+    let temp_file_path = temp_dir.join(name);
+    let storage = temp_file_path.to_string_lossy().to_string();
+    let dataname = format!("data-{}", name);
+    let temp_file_path1 = temp_dir.join(&dataname);
+    let bin = temp_file_path1.to_string_lossy().to_string();
+
+    remove_file(&storage);
+    remove_file(&bin);
+    (storage, bin)
+}
+
+
+
 #[test]
 fn test_add_mix_data() {
+    let (storage, bin) = clean("test_add_mix_data");
     // 打印结构体的大小
     println!("Size of TestStruct: {} bytes", size_of::<TestStruct>());
     dbg!(
@@ -125,8 +148,8 @@ fn test_add_mix_data() {
         size_of::<Duration>()
     );
     let my_service = StaticVectorManageService::<TestStruct>::new(
-        "MixData.bin".to_string(),
-        "MixDataString.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
@@ -146,18 +169,31 @@ fn test_add_mix_data() {
 
 #[test]
 fn test_read_mix_data() {
+    let (storage, bin) = clean("test_read_mix_data");
     let my_service = StaticVectorManageService::<TestStruct>::new(
-        "MixData.bin".to_string(),
-        "MixDataString.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
     dbg!(&my_service.get_length());
+    let mut objs = Vec::new();
+    // 模拟循环生成不同实例
+    for i in 0..COUNT {
+        let instance = TestStruct::new(i);
+        objs.push(instance.clone());
+        // 前 5 次打印实例，后续略过以提高性能
+        if i < 1 {
+            println!("Instance {}: {:?}", i, instance);
+        }
+    }
+    my_service.add_bulk(objs);
     my_service.read_bulk(0, COUNT);
 }
 
 #[test]
 fn test_controled_io_mix_data() {
+    let (storage, bin) = clean("test_controled_io_mix_data");
     // 打印结构体的大小
     println!("Size of TestStruct: {} bytes", size_of::<TestStruct>());
     dbg!(
@@ -171,8 +207,8 @@ fn test_controled_io_mix_data() {
         size_of::<Duration>()
     );
     let my_service = StaticVectorManageService::<TestStruct>::new(
-        "MixDataControlIo.bin".to_string(),
-        "MixDataStringControlIo.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
@@ -192,6 +228,7 @@ fn test_controled_io_mix_data() {
 
 #[test]
 fn test_io_mix_data() {
+    let (storage, bin) = clean("test_io_mix_data");
     // 打印结构体的大小
     println!("Size of TestStruct: {} bytes", size_of::<TestStruct>());
     dbg!(
@@ -205,8 +242,8 @@ fn test_io_mix_data() {
         size_of::<Duration>()
     );
     let my_service = StaticVectorManageService::<TestStruct>::new(
-        "MixDataIo.bin".to_string(),
-        "MixDataStringIo.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();

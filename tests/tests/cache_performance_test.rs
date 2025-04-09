@@ -37,13 +37,29 @@ fn remove_file(path: &str) {
     }
 }
 
+fn clean(name: &str) -> (String, String) {
+    let temp_dir: std::path::PathBuf = std::env::temp_dir();
+    let temp_file_path = temp_dir.join(name);
+    let storage = temp_file_path.to_string_lossy().to_string();
+    let dataname = format!("data-{}", name);
+    let temp_file_path1 = temp_dir.join(&dataname);
+    let bin = temp_file_path1.to_string_lossy().to_string();
+
+    remove_file(&storage);
+    remove_file(&bin);
+    (storage, bin)
+}
+
+
+
 #[test]
 fn test_extend_static() {
+    let (storage, bin) = clean("test_extend_static");
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
+            storage,
+            bin,
             1024,
         );
     for i in 0..COUNT {
@@ -63,19 +79,15 @@ fn test_extend_static() {
 
 #[test]
 fn test_pull_lot_static_from_cache() {
+    let (storage, bin) = clean("test_pull_lot_static_from_cache");
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
+            storage,
+            bin,
             1024,
         );
-    let read_cache_service = ReadableCache::<
-        StaticVectorManageService<StaticStruct>,
-        StaticStruct,
-    >::new(
-        "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
-    );
+    
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
             my_usize: 443 + i,
@@ -92,7 +104,7 @@ fn test_pull_lot_static_from_cache() {
     my_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
-    read_cache_service.getting_lot(0, COUNT as u64);
+    my_service.pullx(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot cache duration: {:?}",
@@ -102,19 +114,15 @@ fn test_pull_lot_static_from_cache() {
 
 #[test]
 fn test_getting_lot_static_from_cache() {
+    let (storage, bin) = clean("test_getting_lot_static_from_cache");
     let mut objs = Vec::new();
     let my_service =
         WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
+            storage,
+            bin,
             1024,
         );
-    let read_cache_service = ReadableCache::<
-        StaticVectorManageService<StaticStruct>,
-        StaticStruct,
-    >::new(
-        "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
-    );
+    
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
             my_usize: 443 + i,
@@ -131,7 +139,7 @@ fn test_getting_lot_static_from_cache() {
     my_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
-    read_cache_service.getting_lot(0, COUNT as u64);
+    my_service.pullx(0, COUNT as u64);
     let getting_lot_cache_duration = start.elapsed();
     println!(
         "get lot cache duration: {:?}",
@@ -141,18 +149,16 @@ fn test_getting_lot_static_from_cache() {
 
 #[test]
 fn test_getting_static_multi_turns() {
+    let (storage, bin) = clean("test_getting_static_multi_turns");
     let mut objs = Vec::new();
-    let my_service =
-        WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
+    
     let read_cache_service = ReadableCache::<
         StaticVectorManageService<StaticStruct>,
         StaticStruct,
     >::new(
-        "cacheS.bin".to_string(), "cacheSD.bin".to_string(), 1024
+        storage, 
+        bin, 
+        1024
     );
     for i in 0..COUNT {
         let my_obj: StaticStruct = StaticStruct {
@@ -168,7 +174,7 @@ fn test_getting_static_multi_turns() {
     }
     let mut rng = rand::thread_rng();
     let start = Instant::now();
-    my_service.pushx(objs);
+    read_cache_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let _objs = read_cache_service.getting_lot(0, COUNT as u64);
@@ -193,22 +199,40 @@ fn test_getting_static_multi_turns() {
 
 #[test]
 fn test_read_static_bulk_in_pushed() {
+    let (storage, bin) = clean("test_read_static_bulk_in_pushed");
+    
+    let mut objs = Vec::new();
+for i in 0..COUNT {
+        let my_obj: StaticStruct = StaticStruct {
+            my_usize: 443 + i,
+            my_u64: 53,
+            my_u32: 4399,
+            my_u16: 3306,
+            my_u8: 22,
+            my_boolean: true,
+        };
+
+        objs.push(my_obj);
+    }
+    
     let my_service = StaticVectorManageService::<StaticStruct>::new(
-        "cacheS.bin".to_string(),
-        "cacheSD.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
+    my_service.add_bulk(objs);
     my_service.read_bulk(0, COUNT as u64);
     dbg!(my_service.get_length());
 }
 
 #[test]
 fn test_add_bulk_compare() {
+    let (storage, bin) = clean("test_add_bulk_compare");
     let mut objs = Vec::new();
     let my_service = StaticVectorManageService::<StaticStruct>::new(
-        "cacheS.bin".to_string(),
-        "cacheSD.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
@@ -232,16 +256,12 @@ fn test_add_bulk_compare() {
 
 #[test]
 fn test_compare_static_multi_turns() {
+    let (storage, bin) = clean("test_compare_static_multi_turns");
     let mut objs = Vec::new();
-    let my_service =
-        WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
+    
     let read_service = StaticVectorManageService::<StaticStruct>::new(
-        "cacheS.bin".to_string(),
-        "cacheSD.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
@@ -259,7 +279,7 @@ fn test_compare_static_multi_turns() {
     }
     let mut rng = rand::thread_rng();
     let start = Instant::now();
-    my_service.pushx(objs);
+    read_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let _objs = read_service.read_bulk(0, COUNT as u64);
@@ -284,15 +304,15 @@ fn test_compare_static_multi_turns() {
 
 #[test]
 fn test_writable_cache_getting_static_multi_thread() {
-    remove_file("cacheS9.bin");
-    remove_file("cacheSD9.bin");
+    let (storage, bin) = clean("test_writable_cache_getting_static_multi_thread");
+    
     const COUNT: usize = 1000;
     let mut objs = Vec::new();
     let write_cache_service: Arc<
         WritableCache<StaticVectorManageService<StaticStruct>, StaticStruct>,
     > = Arc::new(VectorEngine::<StaticStruct>::new(
-        "cacheS9.bin".to_string(),
-        "cacheSD9.bin".to_string(),
+        storage,
+        bin,
         1024,
     ));
 
@@ -347,15 +367,14 @@ fn test_writable_cache_getting_static_multi_thread() {
 
 #[test]
 fn test_readable_cache_getting_static_multi_thread() {
-    remove_file("cacheS9.bin");
-    remove_file("cacheSD9.bin");
+    let (storage, bin) = clean("test_readable_cache_getting_static_multi_thread");
     const COUNT: usize = 1000;
     let mut objs = Vec::new();
     let read_cache_service_origin: Arc<
         ReadableCache<StaticVectorManageService<StaticStruct>, StaticStruct>,
     > = Arc::new(VectorEngine::<StaticStruct>::new(
-        "cacheS.bin".to_string(),
-        "cacheSD.bin".to_string(),
+        storage,
+        bin,
         1024,
     ));
     let read_cache_service = Arc::clone(&read_cache_service_origin);
@@ -410,18 +429,13 @@ fn test_readable_cache_getting_static_multi_thread() {
 
 #[test]
 fn test_compare_static_multi_thread() {
+    let (storage, bin) = clean("test_compare_static_multi_thread");
     const COUNT: usize = 1000;
     let mut objs = Vec::new();
-    let my_service =
-        WritableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        );
-    let read_cache_service_origin = Arc::new(
+        let read_cache_service_origin = Arc::new(
         StaticVectorManageService::<StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
+            storage,
+            bin,
             1024,
         )
         .unwrap(),
@@ -441,7 +455,7 @@ fn test_compare_static_multi_thread() {
     }
     // let mut rng = rand::thread_rng();
     let start = Instant::now();
-    my_service.pushx(objs);
+    read_cache_service_origin.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let read_cache_service = Arc::clone(&read_cache_service);
@@ -477,14 +491,15 @@ fn test_compare_static_multi_thread() {
 
 #[test]
 fn test_safe_getting_static_multi_thread() {
+    let (storage, bin) = clean("test_safe_getting_static_multi_thread");
     const COUNT: usize = 1000;
     let mut objs = Vec::new();
     let read_cache_service_origin = Arc::new(Mutex::new(ReadableCache::<
         WritableCache<StaticVectorManageService<StaticStruct>, StaticStruct>,
         StaticStruct,
     >::new(
-        "cacheS.bin".to_string(),
-        "cacheSD.bin".to_string(),
+        storage,
+        bin,
         1024,
     )));
     let read_cache_service = Arc::clone(&read_cache_service_origin);

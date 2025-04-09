@@ -56,8 +56,18 @@ where
             dynamic_repository,
             initial_size_if_not_exists,
         )));
-        let cache = Arc::new(Mutex::new(Vec::with_capacity(DEFAULT_MAX_CACHE_ITEMS)));
-        let max_cache_items = Arc::new(AtomicUsize::new(DEFAULT_MAX_CACHE_ITEMS));
+        let cache = Arc::new(Mutex::new(Vec::with_capacity(
+            std::env::var("MAX_WRCACHE_ITEMS")
+            .unwrap_or_else(|_| DEFAULT_MAX_CACHE_ITEMS.to_string())
+            .parse::<usize>()
+            .expect("MAX_WRCACHE_ITEMS must be a number")
+        )));
+        let max_cache_items = Arc::new(AtomicUsize::new(
+            std::env::var("MAX_WRCACHE_ITEMS")
+            .unwrap_or_else(|_| DEFAULT_MAX_CACHE_ITEMS.to_string())
+            .parse::<usize>()
+            .expect("MAX_WRCACHE_ITEMS must be a number")
+        ));
 
         // 启动后台监控线程，该线程一直检测缓存状态，满足条件时将缓存数据 flush 到数据库
         {
