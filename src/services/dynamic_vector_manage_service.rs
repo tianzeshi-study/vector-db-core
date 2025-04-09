@@ -379,16 +379,10 @@ mod test {
         }
     }
 
-    fn _remove_dir_all(path: &str) {
-        if std::path::Path::new(&path).exists() {
-            std::fs::remove_dir_all(&path).expect("Unable to remove file");
-        }
-    }
-
     #[test]
     fn test_save_one() {
-        remove_file("DynamicX.bin");
-        remove_file("StringDynamicX.bin");
+        remove_file("Dynamic0.bin");
+        remove_file("StringDynamic0.bin");
         let my_service = DynamicVectorManageService::<ExampleStruct>::new(
             "DynamicX.bin".to_string(),
             "StringDynamicX.bin".to_string(),
@@ -410,12 +404,13 @@ mod test {
         my_service.save(my_obj);
     }
 
-    fn save_one() {
-        remove_file("Dynamic0.bin");
-        remove_file("StringDynamic0.bin");
+    #[test]
+    fn test_load_one() {
+        remove_file("Dynamic1.bin");
+        remove_file("StringDynamic1.bin");
         let my_service = DynamicVectorManageService::<ExampleStruct>::new(
-            "Dynamic0.bin".to_string(),
-            "StringDynamic0.bin".to_string(),
+            "Dynamic1.bin".to_string(),
+            "StringDynamic1.bin".to_string(),
             1024,
         )
         .unwrap();
@@ -432,32 +427,22 @@ mod test {
         println!("size of my obj: {}", size_of_val(&my_obj));
 
         my_service.save(my_obj);
-    }
 
-    #[test]
-    fn test_load_one() {
-        save_one();
-        let read_service = DynamicVectorManageService::<ExampleStruct>::new(
-            "Dynamic0.bin".to_string(),
-            "StringDynamic0.bin".to_string(),
-            1024,
-        )
-        .unwrap();
-        let obj = read_service.load(0);
+        let obj = my_service.load(0);
         assert_eq!(0, obj.id);
         println!("read one result:\n {:?}", obj);
-        let length = read_service.get_length();
+        let length = my_service.get_length();
         assert_eq!(length, 1);
     }
 
     #[test]
     fn test_save_bulk() {
-        remove_file("DynamicY.bin");
-        remove_file("StringDynamic.Ybin");
+        remove_file("Dynamic2.bin");
+        remove_file("StringDynamic2.bin");
 
         let write_service = DynamicVectorManageService::<ExampleStruct>::new(
-            "DynamicY.bin".to_string(),
-            "StringDynamicY.bin".to_string(),
+            "Dynamic2.bin".to_string(),
+            "StringDynamic2.bin".to_string(),
             1024,
         )
         .unwrap();
@@ -480,11 +465,11 @@ mod test {
 
     #[test]
     fn test_load_bulk() {
-        remove_file("Dynamic.bin");
-        remove_file("StringDynamic.bin");
+        remove_file("Dynamic3.bin");
+        remove_file("StringDynamic3.bin");
         let read_service = DynamicVectorManageService::<ExampleStruct>::new(
-            "Dynamic.bin".to_string(),
-            "StringDynamic.bin".to_string(),
+            "Dynamic3.bin".to_string(),
+            "StringDynamic3.bin".to_string(),
             1024,
         )
         .unwrap();
@@ -519,11 +504,11 @@ mod test {
 
     #[test]
     fn test_get_dynamic_length() {
-        remove_file("Dynamic.bin");
-        remove_file("StringDynamic.bin");
+        remove_file("Dynamic4.bin");
+        remove_file("StringDynamic4.bin");
         let read_service = DynamicVectorManageService::<ExampleStruct>::new(
-            "Dynamic.bin".to_string(),
-            "StringDynamic.bin".to_string(),
+            "Dynamic4.bin".to_string(),
+            "StringDynamic4.bin".to_string(),
             1024,
         )
         .unwrap();

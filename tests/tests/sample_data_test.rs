@@ -16,8 +16,33 @@ pub struct SampleData {
     pub my_string2: Option<String>, // 可选字符串，可以为空
 }
 
+
+fn remove_file(path: &str) {
+    // let path = path.to_string();
+    if std::path::Path::new(&path).exists() {
+        std::fs::remove_file(&path).expect("Unable to remove file");
+    }
+}
+
+fn clean(name: &str) -> (String, String) {
+    let temp_dir: std::path::PathBuf = std::env::temp_dir();
+let temp_file_path = temp_dir.join(name);
+let storage  = temp_file_path.to_string_lossy().to_string();
+let dataname =format!("data-{}", name);
+let temp_file_path1 = temp_dir.join(&dataname);
+let bin =  temp_file_path1.to_string_lossy().to_string();
+
+
+    remove_file(&storage);
+    remove_file(&bin);
+(storage, bin)
+}
+
+
+
 #[test]
 fn test_save_sample_one() {
+    let (storage, bin) =clean("test_save_sample_one");
     let i = 4399;
 
     let my_obj = SampleData {
@@ -28,8 +53,8 @@ fn test_save_sample_one() {
         my_string2: Some(format!("This is another longer string. {}", i).to_string()),
     };
     let my_service = DynamicVectorManageService::<SampleData>::new(
-        "sampleData.bin".to_string(),
-        "StringDynamicsampleData.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
@@ -38,13 +63,24 @@ fn test_save_sample_one() {
 
 #[test]
 fn test_load_sample_one() {
-    test_save_sample_one();
+    let (storage, bin) =clean("test_load_sample_one");
+
     let my_service = DynamicVectorManageService::<SampleData>::new(
-        "sampleData.bin".to_string(),
-        "StringDynamicsampleData.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
+    let i = 4399;
+
+    let my_obj = SampleData {
+        my_number1: i as i32,
+        my_string1: format!("Hello, World! 你好世界 {}", i).to_string(),
+        my_number2: i as i32 * 10,
+        my_boolean1: i % 2 == 0,
+        my_string2: Some(format!("This is another longer string. {}", i).to_string()),
+    };
+my_service.save(my_obj);
     let i = 0;
     // let obj  =  my_service.load(COUNT as u64 );
     let obj = my_service.load(i as u64);
@@ -53,10 +89,11 @@ fn test_load_sample_one() {
 
 #[test]
 fn test_save_sample_bulk() {
+    let (storage, bin) =clean("test_save_sample_bulk");
     let mut objs = Vec::new();
     let my_service = DynamicVectorManageService::<SampleData>::new(
-        "sampleData.bin".to_string(),
-        "StringDynamicsampleData.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();
@@ -88,10 +125,11 @@ fn test_save_sample_bulk() {
 
 #[test]
 fn test_io_sample_bulk() {
+    let (storage, bin) =clean("test_io_sample_bulk");
     let mut objs = Vec::new();
     let my_service = DynamicVectorManageService::<SampleData>::new(
-        "sampleDataIo.bin".to_string(),
-        "StringDynamicsampleDataIo.bin".to_string(),
+        storage,
+        bin,
         1024,
     )
     .unwrap();

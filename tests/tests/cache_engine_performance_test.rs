@@ -9,6 +9,7 @@ use std::{
     time::Instant,
 };
 use vector_db_core::*;
+use serial_test::serial;
 
 const COUNT: usize = 1000000;
 const TURNS: usize = 3;
@@ -73,9 +74,23 @@ fn remove_file(path: &str) {
     }
 }
 
+fn clean(name: &str) -> (String, String) {
+    let temp_dir: std::path::PathBuf = std::env::temp_dir();
+let temp_file_path = temp_dir.join(name);
+let storage  = temp_file_path.to_string_lossy().to_string();
+let dataname =format!("data-{}", name);
+let temp_file_path1 = temp_dir.join(&dataname);
+let bin =  temp_file_path1.to_string_lossy().to_string();
+
+
+    remove_file(&storage);
+    remove_file(&bin);
+(storage, bin)
+}
+
 #[test]
 fn test_cache_engine_sample_one() {
-    remove_file("cacheS4.bin");
+    let (storage, bin) =clean("test_cache_engine_sample_one");
     let i = 0;
 
     let my_obj = SampleData {
@@ -90,8 +105,8 @@ fn test_cache_engine_sample_one() {
         WritableCache<DynamicVectorManageService<SampleData>, SampleData>,
         SampleData,
     > = VectorEngine::<SampleData>::new(
-        "cacheS4.bin".to_string(),
-        "cacheSD4.bin".to_string(),
+        storage,
+        bin,
         1024,
     );
 
@@ -104,15 +119,14 @@ fn test_cache_engine_sample_one() {
 #[test]
 fn test_one_by_one_cache_engine_sample() {
     const COUNT: usize = 1000;
-    remove_file("cacheSO.bin");
-    remove_file("cacheSDO.bin");
+    let (storage, bin) =clean("test_one_by_one_cache_engine_sample");
 
     let my_service: ReadableCache<
         WritableCache<DynamicVectorManageService<SampleData>, SampleData>,
         SampleData,
     > = VectorEngine::<SampleData>::new(
-        "cacheSO.bin".to_string(),
-        "cacheSDO.bin".to_string(),
+        storage,
+        bin,
         1024,
     );
     let start = Instant::now();
@@ -154,16 +168,16 @@ fn test_one_by_one_cache_engine_sample() {
 }
 
 #[test]
+#[serial]
 fn test_cache_engine_sample_bulk() {
-    remove_file("cacheS411.bin");
-    remove_file("cacheSD411.bin");
+    let (storage, bin) =clean("test_cache_engine_sample_bulk");
     let mut objs = Vec::new();
     let my_service: ReadableCache<
         WritableCache<DynamicVectorManageService<SampleData>, SampleData>,
         SampleData,
     > = VectorEngine::<SampleData>::new(
-        "cacheS411.bin".to_string(),
-        "cacheSD411.bin".to_string(),
+        storage,
+        bin,
         1024,
     );
     for i in 0..COUNT {
@@ -185,23 +199,24 @@ fn test_cache_engine_sample_bulk() {
 }
 
 #[test]
+#[serial]
 fn test_cache_engine_read_sample_bulk() {
-    remove_file("SampleData.bin");
-    remove_file("dynamicSampleData.bin");
+    let (storage, bin) =clean("test_cache_engine_read_sample_bulk");
+
     let objs = get_sample_objs();
     let my_service: ReadableCache<
         WritableCache<DynamicVectorManageService<SampleData>, SampleData>,
         SampleData,
     > = VectorEngine::<SampleData>::new(
-        "SampleData.bin".to_string(),
-        "dynamicSampleData.bin".to_string(),
+        storage,
+        bin,
         1024,
     );
     let start = Instant::now();
     my_service.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", COUNT, extend_duration);
-    let objs = my_service.pullx(0, COUNT as u64);
+    let objs = my_service.getx(0, COUNT as u64).unwrap();
     let read_bulk_duration = start.elapsed(); // 计算时间差
     println!(
         "load {} items   took: {:?}",
@@ -225,17 +240,17 @@ fn test_cache_engine_read_sample_bulk() {
 }
 
 #[test]
+#[serial]
 fn test_cache_engine_mix_sample_bulk() {
-    remove_file("SampleDataMix.bin");
-    remove_file("dynamicSampleDataMix.bin");
+    let (storage, bin) =clean("test_cache_engine_mix_sample_bulk");
     let objs = get_specific_sample_objs(COUNT / 2 + 1);
     let objs1 = get_specific_sample_objs(COUNT / 2 - 1);
     let my_service: ReadableCache<
         WritableCache<DynamicVectorManageService<SampleData>, SampleData>,
         SampleData,
     > = VectorEngine::<SampleData>::new(
-        "SampleDataMix.bin".to_string(),
-        "dynamicSampleDataMix.bin".to_string(),
+        storage,
+        bin,
         1024,
     );
     let start = Instant::now();
@@ -244,11 +259,11 @@ fn test_cache_engine_mix_sample_bulk() {
     my_service.pushx(objs);
     let extend_duration = start.elapsed();
     println!("extend {} items  took: {:?}", objs_len, extend_duration);
-    my_service.pullx(0, objs_len as u64);
+    let objs = my_service.getx(0, objs_len as u64).unwrap();
     let pull_duration = start.elapsed();
     println!(
         "pull {} items  took: {:?}",
-        objs_len,
+        objs.len(),
         pull_duration - extend_duration
     );
     my_service.pushx(objs1);
@@ -258,7 +273,7 @@ fn test_cache_engine_mix_sample_bulk() {
         objs1_len,
         extend_duration1 - pull_duration
     );
-    let objs = my_service.pullx(0, COUNT as u64);
+    let objs = my_service.getx(0, COUNT as u64).unwrap();
     let read_bulk_duration = start.elapsed(); // 计算时间差
     println!(
         "load {} items   took: {:?}",
@@ -270,10 +285,10 @@ fn test_cache_engine_mix_sample_bulk() {
 }
 
 #[test]
+#[serial]
 fn test_cache_engine_getting_sample_multi_thread() {
     const COUNT: usize = 1000;
-    remove_file("SampleDataM.bin");
-    remove_file("dynamicSampleDataM.bin");
+    let (storage, bin) =clean("test_cache_engine_getting_sample_multi_thread");
     let objs = get_sample_objs();
     let read_cache_service_origin: Arc<
         ReadableCache<
@@ -281,20 +296,22 @@ fn test_cache_engine_getting_sample_multi_thread() {
             SampleData,
         >,
     > = Arc::new(VectorEngine::<SampleData>::new(
-        "SampleDataM.bin".to_string(),
-        "dynamicSampleDataM.bin".to_string(),
+        storage,
+        bin,
         1024,
     ));
 
     let start = Instant::now();
-    read_cache_service_origin.pushx(objs);
+    read_cache_service_origin.pushx(objs.clone());
     let extend_duration = start.elapsed();
-    println!("extend {} items  took: {:?}", COUNT, extend_duration);
+    println!("extend {} items  took: {:?}", objs.len(), extend_duration);
 
     let read_cache_service = Arc::clone(&read_cache_service_origin);
 
     // let read_cache_service = Arc::clone(&read_cache_service);
-    let objs = read_cache_service.getting_lot(0, COUNT as u64);
+    // let objs = read_cache_service.getting_lot(0, COUNT as u64);
+    let objs = read_cache_service.getx(0, COUNT as u64).unwrap();
+    dbg!(&objs.len());
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
@@ -326,15 +343,15 @@ fn test_cache_engine_getting_sample_multi_thread() {
 }
 
 #[test]
+#[serial]
 fn test_cache_engine_compare_getting_sample_multi_thread() {
     const COUNT: usize = 1000;
-    remove_file("SampleDataM1.bin");
-    remove_file("dynamicSampleDataM1.bin");
+    let (storage, bin) =clean("test_cache_engine_compare_getting_sample_multi_thread");
     let objs = get_sample_objs();
     let read_cache_service_origin: Arc<DynamicVectorManageService<SampleData>> = Arc::new(
         DynamicVectorManageService::<SampleData>::new(
-            "SampleDataM1.bin".to_string(),
-            "dynamicSampleDataM1.bin".to_string(),
+            storage,
+            bin,
             1024,
         )
         .unwrap(),
@@ -379,63 +396,12 @@ fn test_cache_engine_compare_getting_sample_multi_thread() {
     );
 }
 
-fn test_cache_engine_getting_sample_parallel() {
-    const COUNT: usize = 1000;
-    remove_file("SampleDataMP.bin");
-    remove_file("dynamicSampleDataMP.bin");
-    let objs = get_sample_objs();
-    let read_cache_service_origin: Arc<
-        ReadableCache<
-            WritableCache<DynamicVectorManageService<SampleData>, SampleData>,
-            SampleData,
-        >,
-    > = Arc::new(VectorEngine::<SampleData>::new(
-        "SampleDataMP.bin".to_string(),
-        "dynamicSampleDataMP.bin".to_string(),
-        1024,
-    ));
 
-    let start = Instant::now();
-    read_cache_service_origin.pushx(objs);
-    let extend_duration = start.elapsed();
-    println!("extend {} items  took: {:?}", COUNT, extend_duration);
-
-    let read_cache_service = Arc::clone(&read_cache_service_origin);
-
-    let objs = read_cache_service.getting_lot(0, COUNT as u64);
-    dbg!(&objs.len());
-    let pull_lot_cache_duration = start.elapsed();
-    println!(
-        "pull lot duration: {:?}",
-        pull_lot_cache_duration - extend_duration
-    );
-    let handles = (0..TURNS)
-        .collect::<Vec<usize>>()
-        .par_iter()
-        .map(|i| {
-            let read_cache_service = Arc::clone(&read_cache_service);
-
-            let mut rng = rand::thread_rng();
-            for i in 0..(COUNT / TURNS) {
-                let random_int: u64 = rng.gen_range(0..(COUNT / TURNS) as u64);
-                let obj1 = read_cache_service.getting(random_int);
-                dbg!(obj1.my_number1);
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let get_from_cache_duration = start.elapsed();
-    println!(
-        "get from  cache duration: {:?}",
-        get_from_cache_duration - pull_lot_cache_duration
-    );
-}
 
 #[test]
 fn test_parallel_cache_engine_sample() {
     const COUNT: usize = 1000;
-    remove_file("cacheSP.bin");
-    remove_file("cacheSDP.bin");
+    let (storage, bin) =clean("test_parallel_cache_engine_sample");
 
     let my_service: Arc<
         ReadableCache<
@@ -443,8 +409,8 @@ fn test_parallel_cache_engine_sample() {
             SampleData,
         >,
     > = Arc::new(VectorEngine::<SampleData>::new(
-        "cacheSP.bin".to_string(),
-        "cacheSDP.bin".to_string(),
+        storage,
+        bin,
         1024,
     ));
     let start = Instant::now();
