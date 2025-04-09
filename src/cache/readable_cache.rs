@@ -1,17 +1,12 @@
+use lru::LruCache;
 use rayon::prelude::*;
 use serde::{
     Deserialize,
     Serialize,
 };
-use std::{
-    collections::{
-        HashMap,
-        LinkedList,
-    },
-    sync::{
-        Arc,
-        Mutex,
-    },
+use std::sync::{
+    Arc,
+    Mutex,
 };
 
 use crate::vector_engine::VectorEngine;
@@ -30,10 +25,8 @@ where
         + Sync,
 {
     database: D,
-    cache: Arc<Mutex<HashMap<u64, T>>>,
-    lru_list: Arc<Mutex<LinkedList<u64>>>,
-
-    max_cache_items: usize,
+    // 使用 LruCache 来同时维护数据与 LRU 顺序，容量设置为 MAX_CACHE_ITEMS
+    cache: Arc<Mutex<LruCache<u64, T>>>,
 }
 
 impl<D, T> ReadableCache<D, T>
@@ -58,126 +51,66 @@ where
                 dynamic_repository,
                 initial_size_if_not_exists,
             ),
-            cache: Arc::new(Mutex::new(HashMap::new())),
-            lru_list: Arc::new(Mutex::new(LinkedList::new())),
-
-            max_cache_items: MAX_CACHE_ITEMS,
+            cache: Arc::new(Mutex::new(LruCache::new(
+                std::num::NonZero::new(
+                    std::env::var("MAX_RECACHE_ITEMS")
+                        .unwrap_or_else(|_| MAX_CACHE_ITEMS.to_string())
+                        .parse::<usize>()
+                        .expect("MAX_RECACHE_ITEMS must be a number"),
+                )
+                .unwrap(),
+            ))),
         }
     }
 
+    /// 同步从缓存或数据库中获取数据。
+    /// 如果命中缓存，则 LruCache 内部会自动将该 key 标记为最近使用。
     pub fn getting(&self, index: u64) -> T {
-        if let Some(page_data) = self.cache.lock().unwrap().get(&index) {
-            self.check_lru_list(index);
-            return page_data.clone();
+        {
+            // 读取缓存，如果命中则返回，同时更新 recency（get_mut 会更新 recency）
+            let mut cache = self.cache.lock().unwrap();
+            if let Some(page_data) = cache.get_mut(&index) {
+                return page_data.clone();
+            }
         }
-
+        // 缓存未命中时，同步从数据库中拉取数据
         let page_data = self.database.pull(index);
-
         self.add_to_cache(index, page_data.clone());
         page_data
     }
 
+    /// 批量获取数据，仅通过数据库拉取，不更新缓存
     pub fn getting_lot(&self, index: u64, count: u64) -> Vec<T> {
-        // self.add_bulk_to_cache(index, page_data.clone());
         self.database.pullx(index, count)
     }
 
+    /// 同步添加单个数据到缓存
     pub fn add_to_cache(&self, index: u64, data: T) {
-        let cache_clone = Arc::clone(&self.cache);
-        let lru_list_clone = Arc::clone(&self.lru_list);
-        let max_cache_items = self.max_cache_items;
-        std::thread::spawn(move || {
-            let mut lru_list = lru_list_clone.lock().unwrap();
-
-            while lru_list.len() >= max_cache_items && !lru_list.is_empty() {
-                if let Some(oldest_page) = lru_list.pop_front() {
-                    cache_clone.lock().unwrap().remove(&oldest_page);
-                }
-            }
-
-            cache_clone.lock().unwrap().insert(index, data);
-            lru_list.push_back(index);
-        });
+        let mut cache = self.cache.lock().unwrap();
+        // put 方法会自动将该 key 插入或更新 recency，
+        // 若容量超过上限会自动淘汰最旧的条目
+        cache.put(index, data);
     }
 
+    /// 同步批量添加数据到缓存
+    /// 这里利用 Rayon 并行计算每个元素的 key，然后在当前线程中将所有数据插入 LruCache
     pub fn add_bulk_to_cache(&self, index: u64, objs: Vec<T>) {
-        let cache_clone = Arc::clone(&self.cache);
-        let lru_list_clone = Arc::clone(&self.lru_list);
-        let objs_len = objs.len();
-        let max_cache_items = self.max_cache_items;
-        std::thread::spawn(move || {
-            let (cache_hashmap, mut cache_linklist): (HashMap<u64, T>, LinkedList<u64>) =
-                objs.par_iter()
-                    .enumerate()
-                    .map(|(i, obj)| {
-                        let cache_index = i as u64 + index;
-                        ((cache_index, obj.clone()), (cache_index))
-                    })
-                    .fold(
-                        || (HashMap::with_capacity(objs_len), LinkedList::new()),
-                        |mut acc, (cache_hashmap, cache_linklist)| {
-                            acc.0.insert(cache_hashmap.0, cache_hashmap.1);
-                            acc.1.push_back(cache_linklist);
-                            acc
-                        },
-                    )
-                    .reduce(
-                        || (HashMap::with_capacity(objs_len), LinkedList::new()),
-                        |(mut map1, mut link1), (map2, mut link2)| {
-                            map1.extend(map2);
-                            link1.append(&mut link2);
-                            (map1, link1)
-                        },
-                    );
-
-            cache_clone.lock().unwrap().extend(cache_hashmap);
-            let mut lru_list = lru_list_clone.lock().unwrap();
-            lru_list.append(&mut cache_linklist);
-
-            while lru_list.len() >= max_cache_items && !lru_list.is_empty() {
-                if let Some(oldest_page) = lru_list.pop_front() {
-                    cache_clone.lock().unwrap().remove(&oldest_page);
-                }
-            }
-        });
-    }
-
-    fn check_lru_list(&self, index: u64) {
-        let lru_list_clone = Arc::clone(&self.lru_list);
-        let cache_clone = Arc::clone(&self.cache);
-
-        std::thread::spawn(move || {
-            let mut lru_list = lru_list_clone.lock().unwrap();
-            const VERY_RECENT_PAGE_ACCESS_LIMIT: usize = 0x10;
-
-            let mut recent_access =
-                lru_list.iter().rev().take(VERY_RECENT_PAGE_ACCESS_LIMIT);
-
-            if !recent_access.any(|&x| x == index) {
-                let index = 0;
-                let mut cursor = lru_list.cursor_front_mut();
-                let mut index_to_remove: Option<u64> = None;
-
-                while let Some(value) = cursor.current() {
-                    if *value == index {
-                        index_to_remove = Some(*value);
-                        cursor.remove_current();
-                        break;
-                    } else {
-                        cursor.move_next();
-                    }
-                }
-                if let Some(key_to_remove) = index_to_remove {
-                    cache_clone.lock().unwrap().remove(&key_to_remove);
-                }
-                lru_list.push_back(index);
-            }
-        });
+        // 并行生成键值对
+        let entries: Vec<(u64, T)> = objs
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, obj)| ((i as u64 + index), obj))
+            .collect();
+        let mut cache = self.cache.lock().unwrap();
+        for (k, v) in entries {
+            cache.put(k, v);
+        }
     }
 
     pub fn get_length(&self) -> usize {
         self.database.len()
     }
+
     pub fn add(&self, obj: T) {
         self.database.push(obj);
     }
@@ -209,6 +142,7 @@ where
             initial_size_if_not_exists,
         )
     }
+
     fn len(&self) -> usize {
         self.get_length()
     }
@@ -274,7 +208,7 @@ mod test {
             );
 
         for i in 0..COUNT {
-            let my_obj: StaticStruct = StaticStruct {
+            let my_obj = StaticStruct {
                 my_usize: 443 + i,
                 my_u64: 53,
                 my_u32: 4399,
@@ -282,7 +216,6 @@ mod test {
                 my_u8: 22,
                 my_boolean: true,
             };
-
             my_service.push(my_obj);
         }
     }
@@ -295,19 +228,16 @@ mod test {
                 "cacheDD1.bin".to_string(),
                 1024,
             );
-        let mut objs = Vec::new();
-        for i in 0..COUNT {
-            let my_obj: StaticStruct = StaticStruct {
+        let objs: Vec<_> = (0..COUNT)
+            .map(|i| StaticStruct {
                 my_usize: 443 + i,
                 my_u64: 53,
                 my_u32: 4399,
                 my_u16: 3306,
                 my_u8: 22,
                 my_boolean: true,
-            };
-
-            objs.push(my_obj);
-        }
+            })
+            .collect();
         my_service.pushx(objs);
     }
 
@@ -319,19 +249,16 @@ mod test {
                 "cacheDD2.bin".to_string(),
                 1024,
             );
-        let mut objs = Vec::with_capacity(COUNT);
-        for i in 0..COUNT {
-            let my_obj: StaticStruct = StaticStruct {
+        let objs: Vec<_> = (0..COUNT)
+            .map(|i| StaticStruct {
                 my_usize: 443 + i,
                 my_u64: 53,
                 my_u32: 4399,
                 my_u16: 3306,
                 my_u8: 22,
                 my_boolean: true,
-            };
-
-            objs.push(my_obj);
-        }
+            })
+            .collect();
         my_service.pushx(objs);
 
         let read_service = ReadableCache::<
@@ -343,7 +270,6 @@ mod test {
 
         for i in 0..COUNT {
             let obj = read_service.getting(i as u64);
-
             assert_eq!(443 + i, obj.my_usize);
         }
     }
@@ -355,34 +281,28 @@ mod test {
             std::fs::remove_file(&path).expect("Unable to remove file");
         }
         {
-            let mut objs = Vec::new();
-
-            let my_service: StaticVectorManageService<StaticStruct> =
-                VectorEngine::<StaticStruct>::new(
-                    "cacheS3.bin".to_string(),
-                    "cacheSD3.bin".to_string(),
-                    1024,
-                );
-            for i in 0..COUNT {
-                let my_obj: StaticStruct = StaticStruct {
+            let objs: Vec<_> = (0..COUNT)
+                .map(|i| StaticStruct {
                     my_usize: 443 + i,
                     my_u64: 53,
                     my_u32: 4399,
                     my_u16: 3306,
                     my_u8: 22,
                     my_boolean: true,
-                };
-
-                objs.push(my_obj);
-            }
-
+                })
+                .collect();
+            let my_service: StaticVectorManageService<StaticStruct> =
+                VectorEngine::<StaticStruct>::new(
+                    "cacheS3.bin".to_string(),
+                    "cacheSD3.bin".to_string(),
+                    1024,
+                );
             let start = Instant::now();
             my_service.pushx(objs);
             dbg!(my_service.len());
             let os = my_service.pullx(0, COUNT as u64);
             dbg!(&os[os.len() - 1]);
-            let extend_cache_duration = start.elapsed();
-            println!("extend cache duration: {:?}", extend_cache_duration);
+            println!("extend cache duration: {:?}", start.elapsed());
         }
         let read_cache_service =
             ReadableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -390,15 +310,12 @@ mod test {
                 "cacheSD3.bin".to_string(),
                 1024,
             );
-
         let awake = Instant::now();
         let objs = read_cache_service.getting_lot(0, COUNT as u64);
-
-        let getting_lot_cache_duration = awake.elapsed();
-        println!("get lot cache duration: {:?}", getting_lot_cache_duration);
+        println!("get lot cache duration: {:?}", awake.elapsed());
         assert_eq!(442 + COUNT, objs[COUNT as usize - 1].my_usize);
-        assert_eq!(COUNT as usize, objs.len());
-        assert_eq!(COUNT as usize, read_cache_service.get_length());
+        assert_eq!(COUNT, objs.len());
+        assert_eq!(COUNT, read_cache_service.get_length());
     }
 
     #[test]
@@ -408,31 +325,25 @@ mod test {
             std::fs::remove_file(&path).expect("Unable to remove file");
         }
         {
-            let mut objs = Vec::new();
-
-            let my_service: StaticVectorManageService<StaticStruct> =
-                VectorEngine::<StaticStruct>::new(
-                    "cacheS4.bin".to_string(),
-                    "cacheSD4.bin".to_string(),
-                    1024,
-                );
-
-            for i in 0..COUNT {
-                let my_obj: StaticStruct = StaticStruct {
+            let objs: Vec<_> = (0..COUNT)
+                .map(|i| StaticStruct {
                     my_usize: 443 + i,
                     my_u64: 53,
                     my_u32: 4399,
                     my_u16: 3306,
                     my_u8: 22,
                     my_boolean: true,
-                };
-
-                objs.push(my_obj);
-            }
+                })
+                .collect();
+            let my_service: StaticVectorManageService<StaticStruct> =
+                VectorEngine::<StaticStruct>::new(
+                    "cacheS4.bin".to_string(),
+                    "cacheSD4.bin".to_string(),
+                    1024,
+                );
             let start = Instant::now();
             my_service.pushx(objs);
-            let extend_cache_duration = start.elapsed();
-            println!("extend cache duration: {:?}", extend_cache_duration);
+            println!("extend cache duration: {:?}", start.elapsed());
         }
         let read_cache_service =
             ReadableCache::<StaticVectorManageService<StaticStruct>, StaticStruct>::new(
@@ -447,9 +358,8 @@ mod test {
                 assert_eq!(443 + i, obj.my_usize);
             }
         }
-        let get_from_cache_duration = start.elapsed();
+        println!("get from cache duration: {:?}", start.elapsed());
         assert_eq!(COUNT, read_cache_service.get_length());
-        println!("get from  cache duration: {:?}", get_from_cache_duration);
     }
 
     #[test]
@@ -465,25 +375,22 @@ mod test {
 
     #[test]
     fn test_add_bulk_compare() {
-        let mut objs = Vec::new();
-        let my_service = StaticVectorManageService::<StaticStruct>::new(
-            "cacheS.bin".to_string(),
-            "cacheSD.bin".to_string(),
-            1024,
-        )
-        .unwrap();
-        for i in 0..COUNT {
-            let my_obj: StaticStruct = StaticStruct {
+        let objs: Vec<_> = (0..COUNT)
+            .map(|i| StaticStruct {
                 my_usize: 443 + i,
                 my_u64: 53,
                 my_u32: 4399,
                 my_u16: 3306,
                 my_u8: 22,
                 my_boolean: true,
-            };
-
-            objs.push(my_obj);
-        }
+            })
+            .collect();
+        let my_service = StaticVectorManageService::<StaticStruct>::new(
+            "cacheS.bin".to_string(),
+            "cacheSD.bin".to_string(),
+            1024,
+        )
+        .unwrap();
         my_service.add_bulk(objs);
     }
 }

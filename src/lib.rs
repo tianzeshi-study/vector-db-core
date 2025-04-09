@@ -1,10 +1,9 @@
-#![feature(linked_list_cursors)]
-
+#[cfg(feature = "cache")]
 mod cache;
 mod vector_engine;
 
 mod services;
-
+#[cfg(feature = "cache")]
 pub use cache::{
     ReadableCache,
     WritableCache,

@@ -171,17 +171,17 @@ fn test_getting_static_multi_turns() {
     my_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
-    let objs = read_cache_service.getting_lot(0, COUNT as u64);
+    let _objs = read_cache_service.getting_lot(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
-    for turn in 0..TURNS {
-        for i in 0..COUNT {
+    for _turn in 0..TURNS {
+        for _i in 0..COUNT {
             // let obj = read_cache_service.getting(i as u64);
             let random_int: u64 = rng.gen_range(0..COUNT as u64 / 10);
-            let obj1 = read_cache_service.getting(random_int);
+            let _obj1 = read_cache_service.getting(random_int);
         }
     }
     let get_from_cache_duration = start.elapsed();
@@ -230,7 +230,7 @@ fn test_add_bulk_compare() {
     my_service.add_bulk(objs);
 }
 
-// #[test]
+#[test]
 fn test_compare_static_multi_turns() {
     let mut objs = Vec::new();
     let my_service =
@@ -262,17 +262,17 @@ fn test_compare_static_multi_turns() {
     my_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
-    let objs = read_service.read_bulk(0, COUNT as u64);
+    let _objs = read_service.read_bulk(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
-    for turn in 0..TURNS {
-        for i in 0..COUNT {
+    for _turn in 0..TURNS {
+        for _i in 0..COUNT {
             // let obj = read_cache_service.getting(i as u64);
             let random_int: u64 = rng.gen_range(0..COUNT as u64 / 10);
-            let obj1 = read_service.read(random_int);
+            let _obj1 = read_service.read(random_int);
         }
     }
     let get_from_cache_duration = start.elapsed();
@@ -313,22 +313,22 @@ fn test_writable_cache_getting_static_multi_thread() {
     write_cache_service.pushx(objs);
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
-    let read_cache_service = Arc::clone(&write_cache_service);
-    let objs = write_cache_service.pullx(0, COUNT as u64);
+    // let read_cache_service = Arc::clone(&write_cache_service);
+    let _objs = write_cache_service.pullx(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
     let handles = (0..TURNS)
-        .map(|i| {
+        .map(|_i| {
             let read_cache_service = Arc::clone(&write_cache_service);
             std::thread::spawn(move || {
                 let mut rng = rand::thread_rng();
-                for i in 0..(COUNT / TURNS) {
+                for _i in 0..(COUNT / TURNS) {
                     // let obj = read_cache_service.getting(i as u64);
                     let random_int: u64 = rng.gen_range(0..(COUNT / TURNS) as u64 / 10);
-                    let obj1 = read_cache_service.pull(random_int);
+                    let _obj1 = read_cache_service.pull(random_int);
                 }
             })
         })
@@ -377,21 +377,21 @@ fn test_readable_cache_getting_static_multi_thread() {
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let read_cache_service = Arc::clone(&read_cache_service);
-    let objs = read_cache_service.getting_lot(0, COUNT as u64);
+    let _objs = read_cache_service.getting_lot(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
     let handles = (0..TURNS)
-        .map(|i| {
+        .map(|_i| {
             let read_cache_service = Arc::clone(&read_cache_service);
             std::thread::spawn(move || {
                 let mut rng = rand::thread_rng();
-                for i in 0..(COUNT / TURNS) {
+                for _i in 0..(COUNT / TURNS) {
                     // let obj = read_cache_service.getting(i as u64);
                     let random_int: u64 = rng.gen_range(0..(COUNT / TURNS) as u64 / 10);
-                    let obj1 = read_cache_service.getting(random_int);
+                    let _obj1 = read_cache_service.getting(random_int);
                 }
             })
         })
@@ -408,7 +408,7 @@ fn test_readable_cache_getting_static_multi_thread() {
     );
 }
 
-// #[test]
+#[test]
 fn test_compare_static_multi_thread() {
     const COUNT: usize = 1000;
     let mut objs = Vec::new();
@@ -445,21 +445,21 @@ fn test_compare_static_multi_thread() {
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let read_cache_service = Arc::clone(&read_cache_service);
-    let objs = read_cache_service.read_bulk(0, COUNT as u64);
+    let _objs = read_cache_service.read_bulk(0, COUNT as u64);
     let pull_lot_cache_duration = start.elapsed();
     println!(
         "pull lot duration: {:?}",
         pull_lot_cache_duration - extend_cache_duration
     );
     let handles = (0..TURNS)
-        .map(|i| {
+        .map(|_i| {
             let read_cache_service = Arc::clone(&read_cache_service);
             std::thread::spawn(move || {
                 let mut rng = rand::thread_rng();
-                for i in 0..COUNT {
+                for _i in 0..COUNT {
                     // let obj = read_cache_service.getting(i as u64);
                     let random_int: u64 = rng.gen_range(0..COUNT as u64 / 10);
-                    let obj1 = &read_cache_service.read(random_int);
+                    let _obj1 = &read_cache_service.read(random_int);
                 }
             })
         })
@@ -506,7 +506,7 @@ fn test_safe_getting_static_multi_thread() {
     let extend_cache_duration = start.elapsed();
     println!("extend cache duration: {:?}", extend_cache_duration);
     let read_cache_service = Arc::clone(&read_cache_service);
-    let objs = read_cache_service
+    let _objs = read_cache_service
         .lock()
         .unwrap()
         .getting_lot(0, COUNT as u64);
@@ -516,14 +516,14 @@ fn test_safe_getting_static_multi_thread() {
         pull_lot_cache_duration - extend_cache_duration
     );
     let handles = (0..TURNS)
-        .map(|i| {
+        .map(|_i| {
             let read_cache_service = Arc::clone(&read_cache_service);
             std::thread::spawn(move || {
                 let mut rng = rand::thread_rng();
-                for i in 0..(COUNT / TURNS) {
+                for _i in 0..(COUNT / TURNS) {
                     // let obj = read_cache_service.getting(i as u64);
                     let random_int: u64 = rng.gen_range(0..(COUNT / TURNS) as u64 / 10);
-                    let obj1 = read_cache_service.lock().unwrap().getting(random_int);
+                    let _obj1 = read_cache_service.lock().unwrap().getting(random_int);
                 }
             })
         })

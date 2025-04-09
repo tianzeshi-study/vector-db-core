@@ -30,22 +30,21 @@ fn remove_file(path: &str) {
 
 fn clean(name: &str) -> (String, String) {
     let temp_dir: std::path::PathBuf = std::env::temp_dir();
-let temp_file_path = temp_dir.join(name);
-let storage  = temp_file_path.to_string_lossy().to_string();
-let dataname =format!("data-{}", name);
-let temp_file_path1 = temp_dir.join(&dataname);
-let bin =  temp_file_path1.to_string_lossy().to_string();
-
+    let temp_file_path = temp_dir.join(name);
+    let storage = temp_file_path.to_string_lossy().to_string();
+    let dataname = format!("data-{}", name);
+    let temp_file_path1 = temp_dir.join(&dataname);
+    let bin = temp_file_path1.to_string_lossy().to_string();
 
     remove_file(&storage);
     remove_file(&bin);
-(storage, bin)
+    (storage, bin)
 }
 
 #[test]
 fn test_dynamic_vector_one() {
     let (storage, bin) = clean("test_dynamic_vector_one");
-        let i = COUNT;
+    let i = COUNT;
     let my_obj: DynamicStruct = DynamicStruct {
         my_usize: 443 + i,
         my_u64: 53 + i as u64,
@@ -58,12 +57,8 @@ fn test_dynamic_vector_one() {
         my_64_vec: vec![i as u64],
         my_string: format!("hello, {} world", i),
     };
-    let my_service = DynamicVectorManageService::<DynamicStruct>::new(
-        storage,
-        bin,
-        1024,
-    )
-    .unwrap();
+    let my_service =
+        DynamicVectorManageService::<DynamicStruct>::new(storage, bin, 1024).unwrap();
     my_service.save(my_obj);
     my_service.load(0);
 }
@@ -73,12 +68,8 @@ fn test_dynamic_vector_bulk() {
     let (storage, bin) = clean("test_dynamic_vector_bulk");
     let mut my_vec = Vec::new();
     let mut objs = Vec::new();
-    let my_service = DynamicVectorManageService::<DynamicStruct>::new(
-        storage,
-        bin,
-        1024,
-    )
-    .unwrap();
+    let my_service =
+        DynamicVectorManageService::<DynamicStruct>::new(storage, bin, 1024).unwrap();
     for i in 0..COUNT {
         let my_obj: DynamicStruct = DynamicStruct {
             my_usize: 443,

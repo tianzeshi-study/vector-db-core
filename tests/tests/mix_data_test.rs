@@ -55,14 +55,14 @@ impl TestStruct {
         // 时间类型初始化，动态添加偏移
         let time_duration = Duration::new(i, (i % 1_000_000) as u32);
         let system_time = SystemTime::now() + Duration::new(i, 0);
-        let instant = Instant::now() + Duration::from_secs(i);
+        let _instant = Instant::now() + Duration::from_secs(i);
         let unix_epoch =
             UNIX_EPOCH.elapsed().unwrap_or_default() + Duration::from_secs(i);
-        let chrono_utc = Utc::now() + chrono::Duration::seconds(i as i64);
-        let chrono_local = Local::now() + chrono::Duration::seconds(i as i64);
+        let _chrono_utc = Utc::now() + chrono::Duration::seconds(i as i64);
+        let _chrono_local = Local::now() + chrono::Duration::seconds(i as i64);
 
         // UUID 初始化，使用动态种子
-        let uuid = Uuid::from_u128(i as u128 | 0x1234_5678_1234_5678);
+        let _uuid = Uuid::from_u128(i as u128 | 0x1234_5678_1234_5678);
 
         // 哈希初始化，基于索引值生成数据
         // let data = format!("dynamic_data_{}", i.clone()).as_bytes().clone();
@@ -75,13 +75,13 @@ impl TestStruct {
             hasher.finalize()
         };
 
-        let sha512_hash = {
+        let _sha512_hash = {
             let mut hasher = Sha512::new();
             hasher.update(data);
             hasher.finalize()
         };
 
-        let blake2b_hash: [u8; 64] = {
+        let _blake2b_hash: [u8; 64] = {
             let mut hasher = Blake2b::new();
             hasher.update(data);
             hasher.finalize()

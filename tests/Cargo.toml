@@ -15,8 +15,8 @@ path = "tests/lib.rs"
 
 [dependencies]
 vector-db-core = {path =".."} 
-serde = {version = "1.0.214", features = ["derive", "alloc", "unstable"] }
-# serde = { version = "1.0.127", features = ["derive", "array"] }
+# serde = {version = "1.0.214", features = ["derive", "alloc", "unstable"] }
+serde = { version = "1.0.127", features = ["derive", "alloc"] }
 chrono = {version = "0.4.38", features = ["serde"] }
 uuid = {version = "1.11.0", features = ["serde"] }
 sha2 = "0.10.8"
